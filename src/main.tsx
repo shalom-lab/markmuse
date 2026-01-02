@@ -14,7 +14,9 @@ const router = createBrowserRouter([
     path: '/',
     element: <App />
   }
-]);
+], {
+  basename: '/markmuse'
+});
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

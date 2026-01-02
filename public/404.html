@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>MarkMuse</title>
+    <script>
+      // GitHub Pages 404 处理：重定向到 index.html
+      // 单页应用需要将所有请求重定向到 index.html，让 React Router 处理路由
+      const path = window.location.pathname;
+      const search = window.location.search;
+      const hash = window.location.hash;
+      
+      // 重定向到 index.html，保留查询参数和 hash
+      window.location.replace(`/markmuse/index.html${search}${hash}`);
+    </script>
+  </head>
+  <body>
+    <p>Redirecting...</p>
+  </body>
+</html>
+
