@@ -66,16 +66,16 @@ export default function Sidebar({
       label: 'MarkMuse',
       className: 'mb-6' // 为 logo 添加额外的下边距
     },
-    { icon: '↻', label: '同步' },
+    // { icon: '↻', label: '同步' },
     { 
       icon: <WeChatOfficialAccountIcon className="w-5 h-5" />, 
-      label: '复制到微信公众号',
+      label: '公众号',
       onClick: handleWeChatCopy
     },
-    { icon: '知', label: '知乎' },
-    { icon: '∧', label: '导出' },
-    { icon: '⇆', label: '切换' },
-    { icon: '📱', label: '移动端' }
+    // { icon: '知', label: '知乎' },
+    // { icon: '∧', label: '导出' },
+    // { icon: '⇆', label: '切换' },
+    // { icon: '📱', label: '移动端' }
   ];
 
   return (

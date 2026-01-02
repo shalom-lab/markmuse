@@ -34,11 +34,18 @@ export interface ISyncMetadata {
   updatedAt: Date;
 }
 
+export interface ISettings {
+  id?: number;
+  defaultTheme?: string;
+  updatedAt: Date;
+}
+
 export class MarkdownEditorDB extends Dexie {
   files!: Table<IFile>;
   folders!: Table<IFolder>;
   themes!: Table<ITheme>;
   syncMetadata!: Table<ISyncMetadata>;
+  settings!: Table<ISettings>;
 
   constructor() {
     super('MarkdownEditorDB');
@@ -64,6 +71,15 @@ export class MarkdownEditorDB extends Dexie {
       syncMetadata: '++id, updatedAt'
     });
 
+    // 版本 4：添加 settings 表
+    this.version(4).stores({
+      files: '++id, name, parentId, createdAt, updatedAt',
+      folders: '++id, name, parentId, createdAt',
+      themes: '++id, name, isCustom, createdAt, updatedAt',
+      syncMetadata: '++id, updatedAt',
+      settings: '++id, updatedAt'
+    });
+
     // 类型转换
     this.files.hook('reading', (file) => {
       if (file.createdAt) file.createdAt = new Date(file.createdAt);
@@ -86,6 +102,11 @@ export class MarkdownEditorDB extends Dexie {
       if (metadata.lastSyncTime) metadata.lastSyncTime = new Date(metadata.lastSyncTime);
       if (metadata.updatedAt) metadata.updatedAt = new Date(metadata.updatedAt);
       return metadata;
+    });
+
+    this.settings.hook('reading', (settings) => {
+      if (settings.updatedAt) settings.updatedAt = new Date(settings.updatedAt);
+      return settings;
     });
   }
 }

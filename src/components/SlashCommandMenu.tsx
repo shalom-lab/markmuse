@@ -5,7 +5,7 @@ export interface Command {
   label: string;
   icon: string;
   keywords: string[];
-  action: (editor: HTMLTextAreaElement, cursorPos: number) => { text: string; cursorOffset: number };
+  action: () => { text: string; cursorOffset: number };
 }
 
 const commands: Command[] = [
@@ -14,7 +14,7 @@ const commands: Command[] = [
     label: '表情符号',
     icon: '😀',
     keywords: ['emoji', '表情', 'emotion', '图标'],
-    action: (editor, pos) => {
+    action: () => {
       // 这个会触发 emoji 选择器
       return { text: '', cursorOffset: 0 };
     }
@@ -24,7 +24,7 @@ const commands: Command[] = [
     label: '一级标题',
     icon: 'H1',
     keywords: ['h1', '标题1', 'heading1'],
-    action: (editor, pos) => {
+    action: () => {
       const text = '\n# ';
       return { text, cursorOffset: text.length };
     }
@@ -34,7 +34,7 @@ const commands: Command[] = [
     label: '二级标题',
     icon: 'H2',
     keywords: ['h2', '标题2', 'heading2'],
-    action: (editor, pos) => {
+    action: () => {
       const text = '\n## ';
       return { text, cursorOffset: text.length };
     }
@@ -44,7 +44,7 @@ const commands: Command[] = [
     label: '三级标题',
     icon: 'H3',
     keywords: ['h3', '标题3', 'heading3'],
-    action: (editor, pos) => {
+    action: () => {
       const text = '\n### ';
       return { text, cursorOffset: text.length };
     }
@@ -54,7 +54,7 @@ const commands: Command[] = [
     label: '引用块',
     icon: '❝',
     keywords: ['quote', '引用', 'blockquote'],
-    action: (editor, pos) => {
+    action: () => {
       const text = '\n> ';
       return { text, cursorOffset: text.length };
     }
@@ -64,7 +64,7 @@ const commands: Command[] = [
     label: '代码块',
     icon: '</>',
     keywords: ['code', '代码', 'codeblock'],
-    action: (editor, pos) => {
+    action: () => {
       const text = '\n```\n\n```';
       return { text, cursorOffset: 5 };
     }
@@ -74,7 +74,7 @@ const commands: Command[] = [
     label: '无序列表',
     icon: '•',
     keywords: ['list', '列表', 'ul'],
-    action: (editor, pos) => {
+    action: () => {
       const text = '\n- ';
       return { text, cursorOffset: text.length };
     }
@@ -84,7 +84,7 @@ const commands: Command[] = [
     label: '有序列表',
     icon: '1.',
     keywords: ['ol', '有序列表', 'numbered'],
-    action: (editor, pos) => {
+    action: () => {
       const text = '\n1. ';
       return { text, cursorOffset: text.length };
     }
@@ -94,7 +94,7 @@ const commands: Command[] = [
     label: '表格',
     icon: '⊞',
     keywords: ['table', '表格'],
-    action: (editor, pos) => {
+    action: () => {
       const text = '\n| 列1 | 列2 | 列3 |\n|-----|-----|-----|\n|     |     |     |';
       return { text, cursorOffset: 7 };
     }
@@ -104,7 +104,7 @@ const commands: Command[] = [
     label: '分隔线',
     icon: '---',
     keywords: ['hr', '分隔线', 'divider'],
-    action: (editor, pos) => {
+    action: () => {
       const text = '\n---\n';
       return { text, cursorOffset: text.length };
     }

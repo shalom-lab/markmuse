@@ -25,13 +25,14 @@ export async function getThemeByName(name: string): Promise<ITheme | undefined> 
 // 创建新主题
 export async function createTheme(name: string, css: string): Promise<number> {
   const now = new Date();
-  return await db.themes.add({
+  const id = await db.themes.add({
     name,
     css,
     isCustom: true,
     createdAt: now,
     updatedAt: now
   });
+  return id as number;
 }
 
 // 更新主题

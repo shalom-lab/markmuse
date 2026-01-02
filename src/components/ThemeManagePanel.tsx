@@ -19,6 +19,7 @@ export default function ThemeManagePanel({ onClose }: Props) {
     title: string;
     message: string;
     type?: 'info' | 'warning' | 'error' | 'success';
+    confirmText?: string;
     onConfirm?: () => void;
     onCancel?: () => void;
   }>({

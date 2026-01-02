@@ -3,7 +3,7 @@
  * 处理 IndexedDB 和 GitHub 仓库之间的双向同步
  */
 
-import { db, IFile, IFolder, ITheme } from '../db';
+import { db, IFile, IFolder } from '../db';
 import { GitHubApi } from './githubApi';
 
 interface SyncMetadata {
@@ -99,22 +99,13 @@ export class GitHubSync {
     return `${this.filesBasePath}/${pathParts.join('/')}`;
   }
 
-  /**
-   * 确保 GitHub 上的文件夹结构存在
-   * 通过尝试创建文件来间接创建文件夹（GitHub API 会自动创建父目录）
-   */
-  private async ensureFolderExists(folderPath: string): Promise<void> {
-    // GitHub API 在创建文件时会自动创建父目录
-    // 所以我们不需要单独创建文件夹
-    // 这个方法保留用于未来可能的优化
-  }
 
   /**
    * 从路径构建文件夹结构（确保所有父文件夹都存在）
    */
   private async buildFolderStructureFromPath(
     filePath: string,
-    folders: IFolder[]
+    _folders: IFolder[]
   ): Promise<number | null> {
     // 移除 files/ 前缀
     const relativePath = filePath.replace(`${this.filesBasePath}/`, '');
@@ -172,10 +163,8 @@ export class GitHubSync {
         themesDeleted: 0,
       };
 
-      // 获取本地数据
-      const localFiles = await db.files.toArray();
+      // 获取本地文件夹结构（用于构建路径）
       const localFolders = await db.folders.toArray();
-      const localThemes = await db.themes.filter(t => t.isCustom === true).toArray();
 
       // 获取远程文件列表（包含路径和文件信息）
       interface RemoteFileInfo {

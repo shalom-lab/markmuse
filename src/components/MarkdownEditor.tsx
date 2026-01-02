@@ -36,13 +36,13 @@ export default function MarkdownEditor({
   isMarkdownCollapsed,
   isPreviewCollapsed,
   isCssCollapsed,
-  onFormatAction
+  onFormatAction: _onFormatAction
 }: Props) {
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const styleRef = useRef<HTMLStyleElement | null>(null);
   const styleIdRef = useRef(`style-${Math.random().toString(36).slice(2)}`); // 生成唯一 ID
-  const { currentTheme, setTheme, themes } = useTheme();
+  const { currentTheme, setTheme } = useTheme();
   
   // 快捷命令菜单状态
   const [showCommandMenu, setShowCommandMenu] = useState(false);
@@ -67,6 +67,7 @@ export default function MarkdownEditor({
     title: string;
     message: string;
     type?: 'info' | 'warning' | 'error' | 'success';
+    confirmText?: string;
     onConfirm?: () => void;
     onCancel?: () => void;
   }>({
@@ -557,7 +558,7 @@ export default function MarkdownEditor({
     }
     
     // 执行命令动作
-    const { text, cursorOffset } = command.action(textarea, start);
+    const { text, cursorOffset } = command.action();
     
     // 删除 `/` 和查询文本
     const beforeSlash = textarea.value.substring(0, slashIndex);
@@ -1110,6 +1111,7 @@ export default function MarkdownEditor({
         title={dialog.title}
         message={dialog.message}
         type={dialog.type}
+        confirmText={dialog.confirmText}
         onConfirm={dialog.onConfirm}
         onCancel={dialog.onCancel}
       />

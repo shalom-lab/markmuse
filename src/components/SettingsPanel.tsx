@@ -4,6 +4,8 @@ import { GitHubSync } from '../services/githubSync';
 import { db } from '../db';
 import { Dialog } from './Dialog';
 import { showToast } from '../utils/toast';
+import { useTheme } from '../contexts/ThemeContext';
+import { useLiveQuery } from 'dexie-react-hooks';
 
 interface Settings {
   githubRepo?: string;
@@ -13,6 +15,7 @@ interface Settings {
   autoSyncInterval?: number;
   syncOnDeactivate?: boolean;
   syncBasePath?: string;
+  defaultTheme?: string;
 }
 
 interface Props {
@@ -20,6 +23,9 @@ interface Props {
 }
 
 export default function SettingsPanel({ onSave }: Props) {
+  const { themes: builtInThemes, applyDefaultTheme } = useTheme();
+  const customThemes = useLiveQuery(() => db.themes.filter(theme => theme.isCustom === true).toArray());
+  
   const [settings, setSettings] = useState<Settings>({
     githubRepo: '',
     githubToken: '',
@@ -40,6 +46,7 @@ export default function SettingsPanel({ onSave }: Props) {
     title: string;
     message: string;
     type?: 'info' | 'warning' | 'error' | 'success';
+    confirmText?: string;
     onConfirm?: () => void;
     onCancel?: () => void;
   }>({
@@ -53,7 +60,11 @@ export default function SettingsPanel({ onSave }: Props) {
     const loadSettings = async () => {
       try {
         const savedSettings = await getSettings();
-        setSettings(savedSettings);
+        // 如果没有设置过默认主题，使用内置的默认主题 'default'
+        setSettings({
+          ...savedSettings,
+          defaultTheme: savedSettings.defaultTheme || 'default',
+        });
         
         // 加载上次同步时间
         const metadata = await db.syncMetadata.toCollection().first();
@@ -71,6 +82,8 @@ export default function SettingsPanel({ onSave }: Props) {
   const handleSave = async () => {
     try {
       await saveSettings(settings);
+      // 应用默认主题
+      await applyDefaultTheme();
       // 调用回调函数，关闭设置页面并恢复默认视图
       if (onSave) {
         onSave();
@@ -155,8 +168,43 @@ export default function SettingsPanel({ onSave }: Props) {
         <div className="max-w-2xl mx-auto space-y-6">
           <h2 className="text-xl font-semibold mb-4">应用设置</h2>
           
-          {/* 自动保存设置 */}
+          {/* 默认主题设置 */}
           <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-gray-800">默认主题</h3>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                默认主题
+              </label>
+              <select
+                value={settings.defaultTheme || 'default'}
+                onChange={(e) => setSettings({ ...settings, defaultTheme: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <optgroup label="内置主题">
+                  {builtInThemes.map((theme) => (
+                    <option key={theme.id} value={theme.id}>
+                      {theme.name}
+                    </option>
+                  ))}
+                </optgroup>
+                {customThemes && customThemes.length > 0 && (
+                  <optgroup label="自定义主题">
+                    {customThemes.map((theme) => (
+                      <option key={theme.name} value={theme.name}>
+                        {theme.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+              <p className="mt-1 text-xs text-gray-500">
+                设置应用启动时的默认主题
+              </p>
+            </div>
+          </div>
+
+          {/* 自动保存设置 */}
+          <div className="border-t pt-6 space-y-4">
             <h3 className="text-lg font-semibold text-gray-800">自动保存</h3>
             <div>
               <label className="flex items-center">
@@ -451,6 +499,7 @@ export default function SettingsPanel({ onSave }: Props) {
         title={dialog.title}
         message={dialog.message}
         type={dialog.type}
+        confirmText={dialog.confirmText}
         onConfirm={dialog.onConfirm}
         onCancel={dialog.onCancel}
       />

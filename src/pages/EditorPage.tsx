@@ -6,7 +6,6 @@ import { db, IFile } from '../db';
 import SettingsPanel from '../components/SettingsPanel';
 import ThemeManagePanel from '../components/ThemeManagePanel';
 import { getSettings } from '../services/settingsStorage';
-import { GitHubSync } from '../services/githubSync';
 import { showToast } from '../utils/toast';
 
 export default function EditorPage() {
@@ -18,10 +17,9 @@ export default function EditorPage() {
   const [isSettingsVisible, setIsSettingsVisible] = useState(false);
   const [isThemeManageVisible, setIsThemeManageVisible] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const syncIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isSyncingRef = useRef(false);
   const [autoSave, setAutoSave] = useState(true);
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 加载自动保存设置
   useEffect(() => {
@@ -45,6 +43,7 @@ export default function EditorPage() {
       // 使用防抖，避免频繁保存（500ms 内只保存一次）
       saveTimeoutRef.current = setTimeout(async () => {
         try {
+          if (!currentFile.id) return;
           await db.files.update(currentFile.id, {
             content: newContent,
             updatedAt: new Date()
@@ -76,7 +75,7 @@ export default function EditorPage() {
       saveTimeoutRef.current = null;
     }
     
-    console.log('选择文件:', file);
+    //console.log('选择文件:', file);
     setCurrentFile(file);
     setContent(file.content);
   };
@@ -347,7 +346,7 @@ A: 所有数据存储在浏览器的 IndexedDB 中，无需担心数据丢失。
 
   // 定期同步和页面失活同步
   useEffect(() => {
-    let syncInterval: NodeJS.Timeout | null = null;
+    let syncInterval: ReturnType<typeof setInterval> | null = null;
 
     const performSync = async () => {
       const settings = await getSettings();
@@ -402,7 +401,7 @@ A: 所有数据存储在浏览器的 IndexedDB 中，无需担心数据丢失。
     };
 
     // 关闭浏览器前同步（注意：beforeunload 中只能使用同步操作，异步可能无法完成）
-    const handleBeforeUnload = async (e: BeforeUnloadEvent) => {
+    const handleBeforeUnload = async () => {
       const settings = await getSettings();
       if (settings.enableSync && settings.syncOnDeactivate) {
         // 使用 sendBeacon 或 navigator.sendBeacon 进行最后的同步尝试

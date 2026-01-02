@@ -13,13 +13,14 @@ interface Settings {
   autoSyncInterval?: number; // 分钟，0 表示关闭
   syncOnDeactivate?: boolean;
   syncBasePath?: string; // 同步基础路径，默认为空（仓库根目录），所有数据存放在 .markmuse 文件夹下
+  defaultTheme?: string; // 默认主题
 }
 
 const SETTINGS_KEY = 'markmuse-settings';
 const TOKEN_KEY = 'github-token'; // 单独存储 token 到 IndexedDB
 
 /**
- * 获取设置（从 localStorage，token 从 IndexedDB）
+ * 获取设置（从 localStorage，token 从 IndexedDB，defaultTheme 从 IndexedDB）
  */
 export async function getSettings(): Promise<Settings> {
   try {
@@ -47,6 +48,16 @@ export async function getSettings(): Promise<Settings> {
       console.error('获取 token 失败:', error);
     }
 
+    // 从 IndexedDB 获取 defaultTheme
+    try {
+      const settingsRecord = await db.settings.toCollection().first();
+      if (settingsRecord && settingsRecord.defaultTheme) {
+        settings.defaultTheme = settingsRecord.defaultTheme;
+      }
+    } catch (error) {
+      console.error('获取 defaultTheme 失败:', error);
+    }
+
     return settings;
   } catch (error) {
     console.error('获取设置失败:', error);
@@ -61,12 +72,12 @@ export async function getSettings(): Promise<Settings> {
 }
 
 /**
- * 保存设置（基本设置存 localStorage，token 单独存储）
+ * 保存设置（基本设置存 localStorage，token 单独存储，defaultTheme 存 IndexedDB）
  */
 export async function saveSettings(settings: Settings): Promise<void> {
   try {
-    // 分离 token
-    const { githubToken, ...otherSettings } = settings;
+    // 分离 token 和 defaultTheme
+    const { githubToken, defaultTheme, ...otherSettings } = settings;
 
     // 保存基本设置到 localStorage
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(otherSettings));
@@ -80,6 +91,26 @@ export async function saveSettings(settings: Settings): Promise<void> {
       } else {
         // 清除 token
         localStorage.removeItem(TOKEN_KEY);
+      }
+    }
+
+    // 保存 defaultTheme 到 IndexedDB
+    if (defaultTheme !== undefined) {
+      try {
+        const settingsRecord = await db.settings.toCollection().first();
+        if (settingsRecord) {
+          await db.settings.update(settingsRecord.id!, {
+            defaultTheme: defaultTheme || undefined,
+            updatedAt: new Date(),
+          });
+        } else {
+          await db.settings.add({
+            defaultTheme: defaultTheme || undefined,
+            updatedAt: new Date(),
+          });
+        }
+      } catch (error) {
+        console.error('保存 defaultTheme 失败:', error);
       }
     }
   } catch (error) {

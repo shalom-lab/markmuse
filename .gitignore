@@ -1,1 +1,11 @@
 node_modules
+
+dist        
+.markmuse   # 同步目录
+.github     # github action目录
+.vscode     # vscode目录
+.env        # 环境变量
+.env.local  # 环境变量
+.env.development.local  # 环境变量
+.env.test.local  # 环境变量
+.env.production.local  # 环境变量

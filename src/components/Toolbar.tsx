@@ -117,9 +117,9 @@ export default function Toolbar({
           <span className="font-medium text-gray-700">MarkMuse</span>
         </div>
         <nav className="flex items-center space-x-4">
-          <button className="px-2 py-1 hover:bg-gray-100 rounded">
+          {/* <button className="px-2 py-1 hover:bg-gray-100 rounded">
             文件
-          </button>
+          </button> */}
           
           {/* 格式菜单 */}
           <div className="relative" ref={formatMenuRef}>
@@ -319,9 +319,9 @@ export default function Toolbar({
             )}
           </div>
 
-          <button className="px-2 py-1 hover:bg-gray-100 rounded">
+          {/* <button className="px-2 py-1 hover:bg-gray-100 rounded">
             功能
-          </button>
+          </button> */}
           <button 
             onClick={() => {
               if (onOpenHelp) {
@@ -332,9 +332,9 @@ export default function Toolbar({
           >
             帮助
           </button>
-          <button className="px-2 py-1 hover:bg-gray-100 rounded">
+          {/* <button className="px-2 py-1 hover:bg-gray-100 rounded">
             教程
-          </button>
+          </button> */}
           
           {/* 设置按钮 */}
           <button

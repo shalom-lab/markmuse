@@ -9,20 +9,12 @@ import './index.css';
 // 预加载 MathJax 以提高导出性能
 initMathJax();
 
-const router = createBrowserRouter(
-  [
-    {
-      path: '/',
-      element: <App />
-    }
-  ],
+const router = createBrowserRouter([
   {
-    future: {
-      v7_startTransition: true,
-      v7_relativeSplatPath: true
-    }
+    path: '/',
+    element: <App />
   }
-);
+]);
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
