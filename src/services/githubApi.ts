@@ -55,7 +55,10 @@ export class GitHubApi {
     path: string,
     body?: any
   ): Promise<T> {
-    const url = `${this.baseUrl}/repos/${this.owner}/${this.repo}/contents/${path}`;
+    // 对路径进行 URL 编码，确保中文字符等特殊字符正确处理
+    // 需要将路径分段编码，因为 GitHub API 需要路径中的 / 保持原样
+    const encodedPath = path.split('/').map(segment => encodeURIComponent(segment)).join('/');
+    const url = `${this.baseUrl}/repos/${this.owner}/${this.repo}/contents/${encodedPath}`;
     
     const headers: HeadersInit = {
       'Accept': 'application/vnd.github.v3+json',
@@ -77,9 +80,31 @@ export class GitHubApi {
       const data = await response.json();
 
       if (!response.ok) {
-        // 404 表示文件不存在，这是正常的
+        // 404 处理：GET 请求的 404 是正常的（文件不存在），但 PUT/DELETE 的 404 是错误
         if (response.status === 404) {
-          return null as T;
+          // GET 请求：文件不存在，返回 null（正常情况）
+          if (method === 'GET') {
+            return null as T;
+          }
+          // PUT/DELETE 请求：404 表示操作失败（文件不存在或路径错误）
+          throw new GitHubApiError(
+            data.message || `文件不存在或路径错误: ${path}`,
+            response.status,
+            data
+          );
+        }
+        // 422 处理：通常表示验证错误（路径无效、文件太大等）
+        if (response.status === 422) {
+          const errorMessage = data.message || '请求验证失败';
+          const errors = data.errors || [];
+          const errorDetails = errors.length > 0 
+            ? errors.map((e: any) => e.message || e).join('; ')
+            : '';
+          throw new GitHubApiError(
+            `${errorMessage}${errorDetails ? `: ${errorDetails}` : ''}。路径: ${path}`,
+            response.status,
+            data
+          );
         }
         throw new GitHubApiError(
           data.message || `GitHub API 错误: ${response.status}`,
@@ -157,38 +182,67 @@ export class GitHubApi {
     }
 
     try {
-      const data = await this.request<{ content: { sha: string } }>(
+      const data = await this.request<{ content?: { sha?: string }; commit?: { sha?: string } }>(
         'PUT',
         path,
         body
       );
 
+      // PUT 请求不应该返回 null（因为 404 会抛出错误）
       if (!data) {
         throw new GitHubApiError('创建文件失败：服务器返回空响应', 500);
       }
 
+      // GitHub API 返回的响应中，sha 可能在 content 中，也可能在 commit 中
+      const sha = data.content?.sha || data.commit?.sha;
+      if (!sha) {
+        console.error('GitHub API 响应格式异常:', data);
+        throw new GitHubApiError(
+          `创建文件失败：响应中未找到 SHA 值。路径: ${path}`,
+          500
+        );
+      }
+
       return {
-        sha: data.content?.sha || '',
+        sha,
       };
     } catch (error) {
-      // 如果是更新文件时遇到 404，说明文件不存在，需要创建
+      // 如果是更新文件时遇到 404，说明文件不存在，需要创建（不使用 sha）
       if (error instanceof GitHubApiError && error.status === 404 && sha) {
         // 重新尝试创建文件（不使用 sha）
         const createBody: any = {
           message,
           content: encodedContent,
         };
-        const data = await this.request<{ content: { sha: string } }>(
-          'PUT',
-          path,
-          createBody
-        );
-        if (!data) {
-          throw new GitHubApiError('创建文件失败：服务器返回空响应', 500);
+        try {
+          const data = await this.request<{ content?: { sha?: string }; commit?: { sha?: string } }>(
+            'PUT',
+            path,
+            createBody
+          );
+          if (!data) {
+            throw new GitHubApiError('创建文件失败：服务器返回空响应', 500);
+          }
+          
+          const sha = data.content?.sha || data.commit?.sha;
+          if (!sha) {
+            console.error('GitHub API 响应格式异常:', data);
+            throw new GitHubApiError(
+              `创建文件失败：响应中未找到 SHA 值。路径: ${path}`,
+              500
+            );
+          }
+          
+          return {
+            sha,
+          };
+        } catch (retryError) {
+          // 如果重试仍然失败，抛出更详细的错误
+          throw new GitHubApiError(
+            `创建文件失败: ${retryError instanceof Error ? retryError.message : '未知错误'}`,
+            retryError instanceof GitHubApiError ? retryError.status : 500
+          );
         }
-        return {
-          sha: data.content?.sha || '',
-        };
       }
       throw error;
     }
