@@ -114,7 +114,15 @@ export default function Toolbar({
       <div className="flex items-center space-x-6">
         <div className="flex items-center space-x-2">
           <Logo />
-          <span className="font-medium text-gray-700">MarkMuse</span>
+          <a
+            href="https://github.com/shalom-lab/markmuse"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-gray-700 hover:text-blue-600 cursor-pointer transition-colors"
+            title="打开 GitHub 仓库"
+          >
+            MarkMuse
+          </a>
         </div>
         <nav className="flex items-center space-x-4">
           {/* <button className="px-2 py-1 hover:bg-gray-100 rounded">
