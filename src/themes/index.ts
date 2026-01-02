@@ -547,7 +547,7 @@ export const themes: Theme[] = [
 }
 
 #markmuse p {
-  padding-top: 23px;
+  padding-top: 5px;
   color: rgb(74, 74, 74);
   line-height: 1.75em;
 }
@@ -565,41 +565,24 @@ export const themes: Theme[] = [
   font-size: 20px;
   font-weight: bold;
   color: rgb(60, 112, 198);
-  border-bottom: 2px solid #3C7076;
-}
-
-/* 一级标题内容 */
-#markmuse h1 .content {
-  font-size: 20px;
-  color: rgb(60, 112, 198);
-  border-bottom: 2px solid #3C7076;
 }
 
 
 /* 二级标题 */
 #markmuse h2 {
-  display: block;
+  display: table;                  
+  margin: 38px auto 10px auto; 
   text-align: center;
+  font-weight: bold;
+  font-size: 20px;
+  border-bottom: 2px solid #000;
+  padding-bottom: 0 px; 
   background-image: url(https://s2.loli.net/2022/01/14/X3gJHmQsAeStUFW.png); 
-  background-position: center center;
+  background-position: lefgt left;
   background-repeat: no-repeat;
-  background-size: 63px;
-  margin-top: 38px;
-  margin-bottom: 10px;
+  background-size: 100px;
 }
 
-/* 二级标题内容 */
-#markmuse h2 .content {
-  text-align: center;
-  display: inline-block;
-  height: 38px;
-  line-height: 42px;
-  color: rgb(60, 112, 198);
-  background-size: 63px;
-  margin-top: 38px;
-  font-size: 18px;
-  margin-bottom: 10px;
-}
 
 /* 三级标题 */
 #markmuse h3 {
@@ -613,11 +596,13 @@ export const themes: Theme[] = [
 #markmuse ul, #markmuse ol {
   margin: 1em 0;
   padding-left: 2em;
+  list-style-type: decimal;
 }
 
 #markmuse li {
   margin: 0.5em 0;
   line-height: 1.75em;
+  list-style-type: disc;
 }
 
 /* 引用 */
