@@ -69,12 +69,18 @@ export class GitHubSync {
    */
   private async saveMetadata(metadata: SyncMetadata, sha?: string): Promise<void> {
     const content = JSON.stringify(metadata, null, 2);
-    await this.api.putFile(
-      this.metadataPath,
-      content,
-      sha,
-      'Update sync metadata'
-    );
+    try {
+      await this.api.putFile(
+        this.metadataPath,
+        content,
+        sha,
+        sha ? 'Update sync metadata' : 'Create sync metadata'
+      );
+    } catch (error) {
+      // 如果是首次同步，可能需要先创建 .markmuse 目录
+      // GitHub API 的 PUT 应该能自动创建父目录，但如果失败，抛出错误
+      throw new Error(`保存同步元数据失败: ${error instanceof Error ? error.message : '未知错误'}`);
+    }
   }
 
   /**
@@ -179,6 +185,10 @@ export class GitHubSync {
       const getAllFiles = async (path: string): Promise<void> => {
         try {
           const items = await this.api.getDirectory(path);
+          // 如果目录不存在（返回空数组），这是正常的（首次同步）
+          if (items.length === 0) {
+            return;
+          }
           for (const item of items) {
             if (item.type === 'dir') {
               await getAllFiles(item.path);
@@ -205,8 +215,11 @@ export class GitHubSync {
             }
           }
         } catch (error) {
-          // 如果目录不存在，忽略错误
-          console.warn(`无法访问目录 ${path}:`, error);
+          // 如果目录不存在（404），这是正常的（首次同步），静默处理
+          // 其他错误才输出警告
+          if (error instanceof Error && !error.message.includes('404')) {
+            console.warn(`无法访问目录 ${path}:`, error);
+          }
         }
       };
 
@@ -307,9 +320,15 @@ export class GitHubSync {
         const metadataFile = await this.api.getFile(this.metadataPath);
         sha = metadataFile?.sha;
       } catch {
-        // 如果获取失败，说明文件不存在，创建新文件
+        // 如果获取失败，说明文件不存在（首次同步），创建新文件
+        sha = undefined;
       }
-      await this.saveMetadata(metadata, sha);
+      try {
+        await this.saveMetadata(metadata, sha);
+      } catch (error) {
+        // 如果保存 metadata 失败，记录但不影响同步结果
+        console.warn('保存同步元数据失败:', error);
+      }
 
       return {
         success: true,

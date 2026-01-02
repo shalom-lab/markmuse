@@ -35,6 +35,7 @@ export default function SettingsPanel({ onSave }: Props) {
     syncOnDeactivate: false,
     syncBasePath: '', // 默认为空，使用仓库根目录
   });
+  const [savedSettings, setSavedSettings] = useState<Settings | null>(null); // 已保存的设置
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<{
     message: string;
@@ -59,12 +60,15 @@ export default function SettingsPanel({ onSave }: Props) {
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const savedSettings = await getSettings();
+        const loadedSettings = await getSettings();
         // 如果没有设置过默认主题，使用内置的默认主题 'default'
-        setSettings({
-          ...savedSettings,
-          defaultTheme: savedSettings.defaultTheme || 'default',
-        });
+        const settingsWithDefault = {
+          ...loadedSettings,
+          defaultTheme: loadedSettings.defaultTheme || 'default',
+        };
+        setSettings(settingsWithDefault);
+        // 保存已保存的设置副本，用于比较是否有未保存的更改
+        setSavedSettings(JSON.parse(JSON.stringify(settingsWithDefault)));
         
         // 加载上次同步时间
         const metadata = await db.syncMetadata.toCollection().first();
@@ -78,12 +82,21 @@ export default function SettingsPanel({ onSave }: Props) {
     loadSettings();
   }, []);
 
+  // 检查是否有未保存的更改
+  const hasUnsavedChanges = (): boolean => {
+    if (!savedSettings) return false;
+    return JSON.stringify(settings) !== JSON.stringify(savedSettings);
+  };
+
   // 保存设置
   const handleSave = async () => {
     try {
       await saveSettings(settings);
+      // 更新已保存的设置副本
+      setSavedSettings(JSON.parse(JSON.stringify(settings)));
       // 应用默认主题
       await applyDefaultTheme();
+      showToast('设置已保存', { type: 'success' });
       // 调用回调函数，关闭设置页面并恢复默认视图
       if (onSave) {
         onSave();
@@ -96,7 +109,20 @@ export default function SettingsPanel({ onSave }: Props) {
 
   // 手动同步
   const handleSync = async () => {
-    if (!settings.githubRepo || !settings.githubToken) {
+    // 检查是否有未保存的更改
+    if (hasUnsavedChanges()) {
+      setSyncStatus({
+        message: '检测到未保存的设置更改，请先点击"保存设置"按钮保存更改后再同步',
+        type: 'error',
+      });
+      showToast('请先保存设置更改', { type: 'warning' });
+      return;
+    }
+
+    // 从存储中重新读取最新设置，确保使用最新的仓库配置
+    const latestSettings = await getSettings();
+    
+    if (!latestSettings.githubRepo || !latestSettings.githubToken) {
       setSyncStatus({
         message: '请先配置 GitHub 仓库地址和 Token',
         type: 'error',
@@ -109,9 +135,9 @@ export default function SettingsPanel({ onSave }: Props) {
 
     try {
       const sync = new GitHubSync(
-        settings.githubToken, 
-        settings.githubRepo,
-        settings.syncBasePath || ''
+        latestSettings.githubToken, 
+        latestSettings.githubRepo,
+        latestSettings.syncBasePath || ''
       );
       const result = await sync.sync();
 
@@ -164,7 +190,7 @@ export default function SettingsPanel({ onSave }: Props) {
       <div className="flex-none p-2 bg-gray-50 border-b text-sm font-medium">
         设置
       </div>
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto p-6 pb-32">
         <div className="max-w-2xl mx-auto space-y-6">
           <h2 className="text-xl font-semibold mb-4">应用设置</h2>
           
@@ -396,11 +422,17 @@ export default function SettingsPanel({ onSave }: Props) {
                   {/* 立即同步按钮 */}
                   <button
                     onClick={handleSync}
-                    disabled={isSyncing || !settings.enableSync}
+                    disabled={isSyncing || !settings.enableSync || hasUnsavedChanges()}
                     className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    title={hasUnsavedChanges() ? '请先保存设置更改' : ''}
                   >
                     {isSyncing ? '同步中...' : '立即同步'}
                   </button>
+                  {hasUnsavedChanges() && (
+                    <p className="mt-1 text-xs text-yellow-600">
+                      ⚠️ 请先保存设置更改后再同步
+                    </p>
+                  )}
                 </div>
               </>
             )}
@@ -481,13 +513,33 @@ export default function SettingsPanel({ onSave }: Props) {
             </div>
           </div>
 
+        </div>
+      </div>
+
+      {/* 固定在底部的保存栏 */}
+      <div className={`flex-none border-t bg-white shadow-lg transition-all ${
+        hasUnsavedChanges() ? 'border-orange-300' : 'border-gray-200'
+      }`}>
+        <div className="max-w-2xl mx-auto p-4">
+          {/* 未保存提示 */}
+          {hasUnsavedChanges() && (
+            <div className="bg-yellow-50 border border-yellow-300 rounded p-3 text-sm text-yellow-800 mb-3 transition-opacity duration-300">
+              <p className="font-medium mb-1">⚠️ 检测到未保存的设置更改</p>
+              <p>您已修改了设置，但尚未保存。请点击下方的"保存设置"按钮保存更改，否则修改不会生效。</p>
+            </div>
+          )}
+
           {/* 保存按钮 */}
-          <div className="pt-4">
+          <div className="flex items-center justify-end">
             <button
               onClick={handleSave}
-              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+              className={`px-6 py-2.5 rounded transition-all font-medium ${
+                hasUnsavedChanges()
+                  ? 'bg-orange-500 text-white hover:bg-orange-600 shadow-md hover:shadow-lg transform hover:scale-105'
+                  : 'bg-blue-500 text-white hover:bg-blue-600'
+              }`}
             >
-              保存设置
+              {hasUnsavedChanges() ? '💾 保存设置（有未保存的更改）' : '保存设置'}
             </button>
           </div>
         </div>

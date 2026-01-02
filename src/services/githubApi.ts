@@ -156,15 +156,42 @@ export class GitHubApi {
       body.sha = sha;
     }
 
-    const data = await this.request<{ content: { sha: string } }>(
-      'PUT',
-      path,
-      body
-    );
+    try {
+      const data = await this.request<{ content: { sha: string } }>(
+        'PUT',
+        path,
+        body
+      );
 
-    return {
-      sha: data.content?.sha || '',
-    };
+      if (!data) {
+        throw new GitHubApiError('创建文件失败：服务器返回空响应', 500);
+      }
+
+      return {
+        sha: data.content?.sha || '',
+      };
+    } catch (error) {
+      // 如果是更新文件时遇到 404，说明文件不存在，需要创建
+      if (error instanceof GitHubApiError && error.status === 404 && sha) {
+        // 重新尝试创建文件（不使用 sha）
+        const createBody: any = {
+          message,
+          content: encodedContent,
+        };
+        const data = await this.request<{ content: { sha: string } }>(
+          'PUT',
+          path,
+          createBody
+        );
+        if (!data) {
+          throw new GitHubApiError('创建文件失败：服务器返回空响应', 500);
+        }
+        return {
+          sha: data.content?.sha || '',
+        };
+      }
+      throw error;
+    }
   }
 
   /**
