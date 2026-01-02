@@ -294,6 +294,9 @@ export default function SettingsPanel({ onSave }: Props) {
               <p className="mt-1 text-xs text-gray-500">
                 用于访问私有仓库或提高 API 限制
               </p>
+              <p className="mt-1 text-xs text-orange-600 font-medium">
+                ⚠️ 重要：Token 需要 <strong>Write</strong> 权限（Repository permissions → Contents → Write），不仅仅是 Read 权限
+              </p>
             </div>
             
             {/* 启用同步 */}
@@ -443,7 +446,8 @@ export default function SettingsPanel({ onSave }: Props) {
                 <p className="font-medium mb-1">安全提示：</p>
                 <ul className="list-disc list-inside space-y-1">
                   <li>GitHub Token 存储在浏览器本地，请妥善保管</li>
-                  <li>建议使用最小权限的 Personal Access Token</li>
+                  <li>Token 需要 <strong>Write</strong> 权限（不仅仅是 Read）才能同步文件</li>
+                  <li>在 GitHub Token 设置中，Repository permissions → Contents 需要设置为 <strong>Write</strong></li>
                   <li>定期更换 Token 以提高安全性</li>
                 </ul>
               </div>

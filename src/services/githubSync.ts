@@ -77,9 +77,21 @@ export class GitHubSync {
         sha ? 'Update sync metadata' : 'Create sync metadata'
       );
     } catch (error) {
-      // 如果是首次同步，可能需要先创建 .markmuse 目录
-      // GitHub API 的 PUT 应该能自动创建父目录，但如果失败，抛出错误
-      throw new Error(`保存同步元数据失败: ${error instanceof Error ? error.message : '未知错误'}`);
+      // 提供更详细的错误信息
+      const errorMessage = error instanceof Error ? error.message : '未知错误';
+      // 如果是权限错误（403），提供详细的解决建议
+      if (error instanceof Error && (errorMessage.includes('403') || errorMessage.includes('权限不足') || errorMessage.includes('personal access token'))) {
+        throw new Error(
+          `保存同步元数据失败: ${errorMessage}\n\n解决方案：\n1. 检查 GitHub Token 是否有 'repo' 权限（完整仓库访问权限）\n2. 如果是私有仓库，确保 Token 有访问权限\n3. 重新生成 Token：GitHub Settings → Developer settings → Personal access tokens → Generate new token\n4. 选择 'repo' 权限范围`
+        );
+      }
+      // 如果是 404 错误，可能是权限问题或路径问题
+      if (error instanceof Error && errorMessage.includes('404')) {
+        throw new Error(
+          `保存同步元数据失败: ${errorMessage}。请检查：1) GitHub Token 是否有写入权限 2) 仓库路径是否正确 3) 同步路径配置是否正确`
+        );
+      }
+      throw new Error(`保存同步元数据失败: ${errorMessage}`);
     }
   }
 
@@ -401,7 +413,13 @@ export class GitHubSync {
             stats.filesAdded++;
           }
         } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : '未知错误';
           console.error(`同步文件失败 ${remotePath}:`, error);
+          // 如果是 404 错误，可能是权限问题或路径问题
+          if (errorMessage.includes('404') || errorMessage.includes('Not Found')) {
+            console.error(`文件创建失败，可能是权限问题。路径: ${remotePath}`);
+            // 继续处理其他文件，不中断整个同步过程
+          }
           // 继续处理其他文件，不中断整个同步过程
         }
       }

@@ -80,6 +80,25 @@ export class GitHubApi {
       const data = await response.json();
 
       if (!response.ok) {
+        // 403 处理：权限不足或资源不可访问
+        if (response.status === 403) {
+          const errorMessage = data.message || '权限不足';
+          // 检查是否是 Token 权限问题
+          if (errorMessage.includes('personal access token') || 
+              errorMessage.includes('Resource not accessible') ||
+              errorMessage.includes('insufficient_scope')) {
+            throw new GitHubApiError(
+              `Token 权限不足: ${errorMessage}。请检查：1) Token 是否有 'repo' 权限 2) Token 是否已过期 3) 仓库是否为私有仓库且 Token 有访问权限`,
+              response.status,
+              data
+            );
+          }
+          throw new GitHubApiError(
+            `访问被拒绝 (403): ${errorMessage}。请检查 Token 权限和仓库访问权限`,
+            response.status,
+            data
+          );
+        }
         // 404 处理：GET 请求的 404 是正常的（文件不存在），但 PUT/DELETE 的 404 是错误
         if (response.status === 404) {
           // GET 请求：文件不存在，返回 null（正常情况）
@@ -244,6 +263,17 @@ export class GitHubApi {
           );
         }
       }
+      
+      // 如果是创建新文件时遇到 404，可能是权限问题或路径问题
+      if (error instanceof GitHubApiError && error.status === 404 && !sha) {
+        const errorMessage = error.response?.message || error.message;
+        throw new GitHubApiError(
+          `创建文件失败 (404): ${errorMessage}。请检查：1) Token 是否有写入权限 2) 仓库路径是否正确 3) 路径: ${path}`,
+          404,
+          error.response
+        );
+      }
+      
       throw error;
     }
   }

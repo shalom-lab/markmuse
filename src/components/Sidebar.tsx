@@ -60,11 +60,16 @@ export default function Sidebar({
     }
   };
 
+  const handleMarkMuseClick = () => {
+    window.open('https://github.com/shalom-lab/markmuse', '_blank', 'noopener,noreferrer');
+  };
+
   const tools = [
     { 
       icon: <Logo />, 
       label: 'MarkMuse',
-      className: 'mb-6' // 为 logo 添加额外的下边距
+      className: 'mb-6', // 为 logo 添加额外的下边距
+      onClick: handleMarkMuseClick
     },
     // { icon: '↻', label: '同步' },
     { 
