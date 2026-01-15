@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getSettings, saveSettings } from '../services/settingsStorage';
+import { getSettings, saveSettings, generateBookmark } from '../services/settingsStorage';
 import { GitHubSync } from '../services/githubSync';
 import { db } from '../db';
 import { Dialog } from './Dialog';
@@ -457,6 +457,57 @@ export default function SettingsPanel({ onSave }: Props) {
           {/* 数据管理 */}
           <div className="border-t pt-6 space-y-4">
             <h3 className="text-lg font-semibold text-gray-800">数据管理</h3>
+            
+            {/* 生成书签链接 */}
+            <div>
+              <button
+                onClick={async () => {
+                  try {
+                    // 先保存当前设置（如果有未保存的更改）
+                    if (hasUnsavedChanges()) {
+                      showToast('请先保存设置更改', { type: 'warning' });
+                      return;
+                    }
+                    
+                    const bookmarkUrl = await generateBookmark();
+                    
+                    // 复制到剪贴板
+                    await navigator.clipboard.writeText(bookmarkUrl);
+                    
+                    showToast('书签链接已复制到剪贴板！可添加到浏览器书签栏，下次点击即可自动恢复配置', { type: 'success' });
+                    
+                    // 显示链接（可选）
+                    console.log('书签链接:', bookmarkUrl);
+                  } catch (e: any) {
+                    console.error('生成书签失败:', e);
+                    const errorMsg = e?.message || '生成书签失败，请重试';
+                    if (errorMsg.includes('没有可保存的配置')) {
+                      showToast('没有可保存的配置，请先配置 GitHub 仓库和 Token', { type: 'warning' });
+                    } else {
+                      showToast(errorMsg, { type: 'error' });
+                    }
+                  }
+                }}
+                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors text-sm"
+              >
+                生成书签链接
+              </button>
+              <p className="mt-2 text-xs text-gray-500">
+                将当前配置生成书签链接，复制后添加到浏览器书签栏。下次点击书签即可自动恢复配置。
+              </p>
+              <div className="mt-2 p-3 bg-blue-50 rounded border border-blue-200 text-xs">
+                <p className="font-medium text-blue-700 mb-2">使用说明：</p>
+                <ol className="list-decimal list-inside space-y-1 text-blue-600">
+                  <li>点击"生成书签链接"按钮</li>
+                  <li>链接会自动复制到剪贴板</li>
+                  <li>在浏览器书签栏添加新书签，粘贴链接</li>
+                  <li>下次点击书签即可自动恢复配置</li>
+                </ol>
+                <p className="mt-2 text-orange-600 font-medium">
+                  ⚠️ 注意：书签链接包含 GitHub Token，请妥善保管，不要分享给他人
+                </p>
+              </div>
+            </div>
             
             {/* 清空文件数据 */}
             <div>
