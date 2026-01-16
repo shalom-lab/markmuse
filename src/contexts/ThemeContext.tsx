@@ -16,9 +16,20 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [currentThemeId, setCurrentThemeId] = useState<string>(defaultThemeId);
   const [customTheme, setCustomTheme] = useState<{ name: string; css: string } | null>(null);
+  const [isApplyingDefaultTheme, setIsApplyingDefaultTheme] = useState(false);
   
-  // 获取自定义主题列表
-  const customThemes = useLiveQuery(() => db.themes.filter(theme => theme.isCustom === true).toArray());
+  // 获取自定义主题列表（带错误处理）
+  const customThemes = useLiveQuery(
+    () => {
+      try {
+        return db.themes.filter(theme => theme.isCustom === true).toArray();
+      } catch (error) {
+        console.error('获取自定义主题列表失败:', error);
+        return [];
+      }
+    },
+    []
+  );
   
   // 确定当前主题
   const currentTheme: Theme = (() => {
@@ -58,8 +69,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setCustomTheme(null);
   };
 
-  // 应用默认主题
+  // 应用默认主题（带防重复调用）
   const applyDefaultTheme = async () => {
+    // 防止重复调用
+    if (isApplyingDefaultTheme) {
+      return;
+    }
+
+    setIsApplyingDefaultTheme(true);
     try {
       const settings = await getSettings();
       // 如果设置了默认主题，使用设置的；否则使用内置的默认主题
@@ -69,12 +86,29 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       console.error('应用默认主题失败:', error);
       // 出错时使用内置的默认主题
       setTheme(defaultThemeId);
+    } finally {
+      setIsApplyingDefaultTheme(false);
     }
   };
 
-  // 初始化时应用默认主题
+  // 初始化时应用默认主题（只执行一次）
   useEffect(() => {
-    applyDefaultTheme();
+    let mounted = true;
+    
+    const initTheme = async () => {
+      // 等待一小段时间，确保数据库初始化完成
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      if (mounted) {
+        await applyDefaultTheme();
+      }
+    };
+
+    initTheme();
+
+    return () => {
+      mounted = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

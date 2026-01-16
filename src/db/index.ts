@@ -113,6 +113,118 @@ export class MarkdownEditorDB extends Dexie {
 
 export const db = new MarkdownEditorDB();
 
+// 数据库就绪状态
+let dbReady = false;
+let dbReadyPromise: Promise<void> | null = null;
+
+/**
+ * 确保数据库已就绪（带重试逻辑）
+ */
+export async function ensureDbReady(maxRetries = 5, delay = 100): Promise<void> {
+  if (dbReady) {
+    return;
+  }
+
+  if (dbReadyPromise) {
+    return dbReadyPromise;
+  }
+
+  dbReadyPromise = (async () => {
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        // 检查数据库是否已打开
+        if (db.isOpen()) {
+          dbReady = true;
+          return;
+        }
+
+        // 尝试打开数据库
+        await db.open();
+        dbReady = true;
+        return;
+      } catch (error: any) {
+        const errorName = error?.name || '';
+        const errorMessage = error?.message || '';
+
+        // 如果是 DatabaseClosedError 或 UnknownError，等待后重试
+        if (
+          errorName === 'DatabaseClosedError' ||
+          errorName === 'UnknownError' ||
+          errorMessage.includes('backing store') ||
+          errorMessage.includes('UnknownError')
+        ) {
+          if (i < maxRetries - 1) {
+            console.warn(`数据库打开失败，${delay}ms 后重试 (${i + 1}/${maxRetries}):`, errorName);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            delay *= 2; // 指数退避
+            continue;
+          }
+        }
+
+        // 其他错误或重试次数用完，抛出错误
+        console.error('数据库打开失败:', error);
+        throw error;
+      }
+    }
+  })();
+
+  return dbReadyPromise;
+}
+
+/**
+ * 安全执行数据库操作（带错误处理和重试）
+ */
+export async function safeDbOperation<T>(
+  operation: () => Promise<T>,
+  fallback?: T,
+  maxRetries = 3
+): Promise<T> {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      await ensureDbReady();
+      return await operation();
+    } catch (error: any) {
+      const errorName = error?.name || '';
+      const errorMessage = error?.message || '';
+
+      // 如果是数据库关闭错误，尝试重新打开
+      if (
+        errorName === 'DatabaseClosedError' ||
+        errorName === 'UnknownError' ||
+        errorMessage.includes('backing store') ||
+        errorMessage.includes('UnknownError')
+      ) {
+        if (i < maxRetries - 1) {
+          dbReady = false;
+          dbReadyPromise = null;
+          await new Promise(resolve => setTimeout(resolve, 100 * (i + 1)));
+          continue;
+        }
+      }
+
+      // 如果提供了降级值，返回降级值
+      if (fallback !== undefined) {
+        console.warn('数据库操作失败，使用降级值:', errorName);
+        return fallback;
+      }
+
+      // 否则抛出错误
+      throw error;
+    }
+  }
+
+  // 如果所有重试都失败且没有降级值，抛出最后一个错误
+  throw new Error('数据库操作失败，已重试多次');
+}
+
+// 监听数据库错误
+db.on('error', (error) => {
+  console.error('数据库错误:', error);
+  // 重置就绪状态，下次访问时会重试
+  dbReady = false;
+  dbReadyPromise = null;
+});
+
 // 清理示例数据的函数（供外部调用）
 export async function clearExampleData() {
   try {
@@ -166,13 +278,18 @@ export async function clearExampleData() {
 // 初始化数据库
 db.on('ready', async () => {
   console.log('数据库已就绪');
+  dbReady = true;
   
   // 自动清理可能存在的示例数据（如果用户已经删除过，不应该再出现）
   // 检查是否有示例文件夹，如果有则清理
-  const exampleFolders = await db.folders.where('name').equals('示例文件夹').toArray();
-  if (exampleFolders.length > 0) {
-    console.log('检测到示例数据，正在清理...');
-    await clearExampleData();
+  try {
+    const exampleFolders = await db.folders.where('name').equals('示例文件夹').toArray();
+    if (exampleFolders.length > 0) {
+      console.log('检测到示例数据，正在清理...');
+      await clearExampleData();
+    }
+  } catch (error) {
+    console.error('初始化时清理示例数据失败:', error);
   }
   
   // 不再自动创建示例数据，让用户自己管理

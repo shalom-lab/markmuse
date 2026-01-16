@@ -3,7 +3,7 @@
  * 安全存储敏感信息（如 GitHub Token）到 IndexedDB
  */
 
-import { db } from '../db';
+import { db, safeDbOperation } from '../db';
 
 interface Settings {
   githubRepo?: string;
@@ -18,6 +18,7 @@ interface Settings {
 
 const SETTINGS_KEY = 'markmuse-settings';
 const TOKEN_KEY = 'github-token'; // 单独存储 token 到 IndexedDB
+const DEFAULT_THEME_KEY = 'markmuse-default-theme'; // localStorage 降级存储
 
 /**
  * 获取设置（从 localStorage，token 从 IndexedDB，defaultTheme 从 IndexedDB）
@@ -48,14 +49,35 @@ export async function getSettings(): Promise<Settings> {
       console.error('获取 token 失败:', error);
     }
 
-    // 从 IndexedDB 获取 defaultTheme
+    // 从 IndexedDB 获取 defaultTheme（带降级到 localStorage）
     try {
-      const settingsRecord = await db.settings.toCollection().first();
+      const settingsRecord = await safeDbOperation(
+        () => db.settings.toCollection().first(),
+        null,
+        3
+      );
       if (settingsRecord && settingsRecord.defaultTheme) {
         settings.defaultTheme = settingsRecord.defaultTheme;
+        // 同时更新 localStorage 作为备份
+        localStorage.setItem(DEFAULT_THEME_KEY, settingsRecord.defaultTheme);
+      } else {
+        // 如果 IndexedDB 中没有，尝试从 localStorage 获取（降级）
+        const fallbackTheme = localStorage.getItem(DEFAULT_THEME_KEY);
+        if (fallbackTheme) {
+          settings.defaultTheme = fallbackTheme;
+        }
       }
     } catch (error) {
       console.error('获取 defaultTheme 失败:', error);
+      // 降级到 localStorage
+      try {
+        const fallbackTheme = localStorage.getItem(DEFAULT_THEME_KEY);
+        if (fallbackTheme) {
+          settings.defaultTheme = fallbackTheme;
+        }
+      } catch (e) {
+        // localStorage 也失败，忽略
+      }
     }
 
     return settings;
@@ -94,23 +116,38 @@ export async function saveSettings(settings: Settings): Promise<void> {
       }
     }
 
-    // 保存 defaultTheme 到 IndexedDB
+    // 保存 defaultTheme 到 IndexedDB（带 localStorage 备份）
     if (defaultTheme !== undefined) {
+      // 先保存到 localStorage 作为备份
       try {
-        const settingsRecord = await db.settings.toCollection().first();
-        if (settingsRecord) {
-          await db.settings.update(settingsRecord.id!, {
-            defaultTheme: defaultTheme || undefined,
-            updatedAt: new Date(),
-          });
+        if (defaultTheme) {
+          localStorage.setItem(DEFAULT_THEME_KEY, defaultTheme);
         } else {
-          await db.settings.add({
-            defaultTheme: defaultTheme || undefined,
-            updatedAt: new Date(),
-          });
+          localStorage.removeItem(DEFAULT_THEME_KEY);
         }
+      } catch (e) {
+        // localStorage 失败不影响主流程
+      }
+
+      // 然后保存到 IndexedDB
+      try {
+        await safeDbOperation(async () => {
+          const settingsRecord = await db.settings.toCollection().first();
+          if (settingsRecord) {
+            await db.settings.update(settingsRecord.id!, {
+              defaultTheme: defaultTheme || undefined,
+              updatedAt: new Date(),
+            });
+          } else {
+            await db.settings.add({
+              defaultTheme: defaultTheme || undefined,
+              updatedAt: new Date(),
+            });
+          }
+        }, undefined, 3);
       } catch (error) {
-        console.error('保存 defaultTheme 失败:', error);
+        console.error('保存 defaultTheme 到 IndexedDB 失败（已保存到 localStorage）:', error);
+        // 即使 IndexedDB 失败，localStorage 也已经保存了，所以不抛出错误
       }
     }
   } catch (error) {
@@ -125,6 +162,19 @@ export async function saveSettings(settings: Settings): Promise<void> {
 export async function clearSettings(): Promise<void> {
   localStorage.removeItem(SETTINGS_KEY);
   localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(DEFAULT_THEME_KEY);
+  
+  // 清除 IndexedDB 中的设置
+  try {
+    await safeDbOperation(async () => {
+      const settingsRecord = await db.settings.toCollection().first();
+      if (settingsRecord) {
+        await db.settings.delete(settingsRecord.id!);
+      }
+    }, undefined, 2);
+  } catch (error) {
+    console.error('清除 IndexedDB 设置失败:', error);
+  }
 }
 
 /**
