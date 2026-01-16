@@ -218,7 +218,8 @@ export async function safeDbOperation<T>(
 }
 
 // 监听数据库错误
-db.on('error', (error: Error) => {
+// 使用类型断言处理 Dexie 的类型定义问题
+(db as any).on('error', (error: any) => {
   console.error('数据库错误:', error);
   // 重置就绪状态，下次访问时会重试
   dbReady = false;
