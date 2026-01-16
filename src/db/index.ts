@@ -217,14 +217,11 @@ export async function safeDbOperation<T>(
   throw new Error('数据库操作失败，已重试多次');
 }
 
-// 监听数据库错误
-// 使用类型断言处理 Dexie 的类型定义问题
-(db as any).on('error', (error: any) => {
-  console.error('数据库错误:', error);
-  // 重置就绪状态，下次访问时会重试
-  dbReady = false;
-  dbReadyPromise = null;
-});
+// 注意：Dexie 3.x 不支持 on('error') 事件监听器
+// 错误处理通过以下方式完成：
+// 1. safeDbOperation 函数自动处理错误和重试
+// 2. 各个数据库操作都使用 try-catch 处理错误
+// 3. ensureDbReady 函数在数据库打开失败时会自动重试
 
 // 清理示例数据的函数（供外部调用）
 export async function clearExampleData() {

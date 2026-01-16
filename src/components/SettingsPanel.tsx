@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { getSettings, saveSettings, generateBookmark } from '../services/settingsStorage';
-import { GitHubSync } from '../services/githubSync';
 import { db } from '../db';
 import { Dialog } from './Dialog';
 import { showToast } from '../utils/toast';
@@ -134,6 +133,8 @@ export default function SettingsPanel({ onSave }: Props) {
     setSyncStatus({ message: '正在同步...', type: 'info' });
 
     try {
+      // 动态导入 GitHubSync 以支持代码分割
+      const { GitHubSync } = await import('../services/githubSync');
       const sync = new GitHubSync(
         latestSettings.githubToken, 
         latestSettings.githubRepo,

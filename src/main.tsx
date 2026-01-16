@@ -24,7 +24,7 @@ window.addEventListener('load', () => {
 
 const router = createBrowserRouter([
   {
-    path: '/',
+    path: '/*',
     element: <App />
   }
 ], {
@@ -34,7 +34,13 @@ const router = createBrowserRouter([
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ThemeProvider>
-      <RouterProvider router={router} />
+      <RouterProvider 
+        router={router}
+        future={{
+          v7_startTransition: true,
+          v7_relativeSplatPath: true,
+        } as any}
+      />
     </ThemeProvider>
   </React.StrictMode>
 ); 
