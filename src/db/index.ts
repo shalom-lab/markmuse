@@ -218,7 +218,7 @@ export async function safeDbOperation<T>(
 }
 
 // 监听数据库错误
-db.on('error', (error) => {
+db.on('error', (error: Error) => {
   console.error('数据库错误:', error);
   // 重置就绪状态，下次访问时会重试
   dbReady = false;
