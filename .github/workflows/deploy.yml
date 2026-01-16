@@ -1,9 +1,16 @@
-name: Deploy to GitHub Pages
+name: Build and Deploy to GitHub Pages
 
 on:
   push:
     branches:
+      - main
       - master
+    # 排除 .markmuse 目录下的文件修改，避免循环触发
+    # 因为应用会同步数据到这个目录，不应该触发 workflow
+    # 支持根目录和子目录下的 .markmuse（如 docs/.markmuse）
+    paths-ignore:
+      - '.markmuse/**'
+      - '**/.markmuse/**'
   workflow_dispatch:
 
 permissions:
