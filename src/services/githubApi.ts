@@ -155,7 +155,14 @@ export class GitHubApi {
       }
 
       // GitHub API 返回的 content 是 Base64 编码的
-      const content = atob(data.content.replace(/\s/g, ''));
+      // 使用 TextDecoder 确保 UTF-8 解码正确（包括中文）
+      const base64Content = data.content.replace(/\s/g, '');
+      const binaryString = atob(base64Content);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const content = new TextDecoder('utf-8').decode(bytes);
       
       return {
         content,
@@ -187,8 +194,14 @@ export class GitHubApi {
       throw new Error(`文件 ${path} 大小 ${sizeInMB.toFixed(2)}MB，超过 GitHub 限制 100MB`);
     }
 
-    // 将内容编码为 Base64
-    const encodedContent = btoa(unescape(encodeURIComponent(content)));
+    // 将内容编码为 Base64（正确处理 UTF-8 字符，包括中文）
+    // 使用 TextEncoder 和 Uint8Array 确保 UTF-8 编码正确
+    const encodedContent = btoa(
+      new TextEncoder().encode(content).reduce(
+        (data, byte) => data + String.fromCharCode(byte),
+        ''
+      )
+    );
 
     const body: any = {
       message,
