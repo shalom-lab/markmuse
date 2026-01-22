@@ -2,14 +2,14 @@ import { useState, useEffect, useRef } from 'react';
 import Toolbar from '../components/Toolbar';
 import FileTree from '../components/FileTree';
 import MarkdownEditor from '../components/MarkdownEditor';
-import { db, IFile } from '../db';
 import SettingsPanel from '../components/SettingsPanel';
 import ThemeManagePanel from '../components/ThemeManagePanel';
 import { getSettings } from '../services/settingsStorage';
 import { showToast } from '../utils/toast';
+import { saveFileContent, getFileContent } from '../storage/fileTreeService';
 
 export default function EditorPage() {
-  const [currentFile, setCurrentFile] = useState<IFile | null>(null);
+  const [currentFilePath, setCurrentFilePath] = useState<string | null>(null);
   const [content, setContent] = useState('');
   const [isMarkdownVisible, setIsMarkdownVisible] = useState(true);
   const [isPreviewVisible, setIsPreviewVisible] = useState(true);
@@ -34,7 +34,7 @@ export default function EditorPage() {
     setContent(newContent);
     
     // 如果自动保存开启，立即保存
-    if (autoSave && currentFile?.id) {
+    if (autoSave && currentFilePath) {
       // 清除之前的定时器
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
@@ -43,11 +43,8 @@ export default function EditorPage() {
       // 使用防抖，避免频繁保存（500ms 内只保存一次）
       saveTimeoutRef.current = setTimeout(async () => {
         try {
-          if (!currentFile.id) return;
-          await db.files.update(currentFile.id, {
-            content: newContent,
-            updatedAt: new Date()
-          });
+          if (!currentFilePath) return;
+          await saveFileContent(currentFilePath, newContent);
         } catch (error) {
           console.error('自动保存失败:', error);
         }
@@ -56,16 +53,16 @@ export default function EditorPage() {
     // 如果自动保存关闭，不保存（内容只在内存中，切换文件时会丢失）
   };
 
-  const handleSelectFile = async (file: IFile) => {
+  const handleSelectFile = async (filePath: string) => {
     // 如果自动保存关闭，在切换文件前保存当前文件的修改
-    if (!autoSave && currentFile?.id && content !== currentFile.content) {
-      try {
-        await db.files.update(currentFile.id, {
-          content: content,
-          updatedAt: new Date()
-        });
-      } catch (error) {
-        console.error('保存文件失败:', error);
+    if (!autoSave && currentFilePath) {
+      const currentContent = await getFileContent(currentFilePath);
+      if (currentContent !== null && content !== currentContent) {
+        try {
+          await saveFileContent(currentFilePath, content);
+        } catch (error) {
+          console.error('保存文件失败:', error);
+        }
       }
     }
     
@@ -75,9 +72,16 @@ export default function EditorPage() {
       saveTimeoutRef.current = null;
     }
     
-    //console.log('选择文件:', file);
-    setCurrentFile(file);
-    setContent(file.content);
+    // 重新加载文件内容（确保是最新的）
+    try {
+      const fileContent = await getFileContent(filePath);
+      setCurrentFilePath(filePath);
+      setContent(fileContent || '');
+    } catch (error) {
+      console.error('加载文件失败:', error);
+      setCurrentFilePath(filePath);
+      setContent('');
+    }
   };
 
   const handleFormatAction = (shortcut: string) => {
@@ -90,8 +94,16 @@ export default function EditorPage() {
   // 处理打开帮助文档
   const handleOpenHelp = async () => {
     try {
+      const { createFile, getFileContent } = await import('../storage/fileTreeService');
+      
       // 查找是否已存在"帮助文档.md"
-      const existingFile = await db.files.where('name').equals('帮助文档.md').and(f => f.parentId === null).first();
+      let filePath = '帮助文档.md';
+      let existingContent: string | null = null;
+      try {
+        existingContent = await getFileContent(filePath);
+      } catch {
+        // 文件不存在，继续创建
+      }
       
       const helpContent = `# MarkMuse 帮助文档
 
@@ -307,29 +319,15 @@ A: 所有数据存储在浏览器的 IndexedDB 中，无需担心数据丢失。
 如有问题或建议，欢迎反馈！
 `;
 
-      if (existingFile && existingFile.id) {
+      if (existingContent !== null) {
         // 如果文件已存在，更新内容
-        await db.files.update(existingFile.id, {
-          content: helpContent,
-          updatedAt: new Date()
-        });
-        // 打开已存在的文件
-        const updatedFile = await db.files.get(existingFile.id);
-        if (updatedFile) {
-          handleSelectFile(updatedFile);
-        }
+        await saveFileContent(filePath, helpContent);
+        handleSelectFile(filePath);
       } else {
         // 如果文件不存在，创建新文件
-        const newFile = {
-          name: '帮助文档.md',
-          content: helpContent,
-          parentId: null, // 根目录
-          createdAt: new Date(),
-          updatedAt: new Date()
-        };
-        const id = await db.files.add(newFile);
-        const createdFile: IFile = { ...newFile, id: id as number };
-        handleSelectFile(createdFile);
+        filePath = await createFile(null, '帮助文档');
+        await saveFileContent(filePath, helpContent);
+        handleSelectFile(filePath);
       }
       
       // 确保显示编辑页面（关闭设置、主题管理等）
@@ -361,14 +359,13 @@ A: 所有数据存储在浏览器的 IndexedDB 中，无需担心数据丢失。
 
       try {
         isSyncingRef.current = true;
-        const { GitHubSync } = await import('../services/githubSync');
-        const sync = new GitHubSync(
-          settings.githubToken,
-          settings.githubRepo,
-          settings.syncBasePath || ''
-        );
-        await sync.sync();
-        console.log('自动同步完成');
+        const { syncAllMarkdownFiles } = await import('../sync/syncEngine');
+        const { loadGitHubConfig } = await import('../services/githubConfig');
+        const config = loadGitHubConfig();
+        if (config) {
+          await syncAllMarkdownFiles(config);
+          console.log('自动同步完成');
+        }
       } catch (error) {
         console.error('自动同步失败:', error);
       } finally {
@@ -478,7 +475,7 @@ A: 所有数据存储在浏览器的 IndexedDB 中，无需担心数据丢失。
           }}
         >
           <FileTree 
-            currentFileId={currentFile?.id} 
+            currentFilePath={currentFilePath} 
             onSelectFile={handleSelectFile}
             isCollapsed={isSidebarCollapsed}
             onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
@@ -505,12 +502,12 @@ A: 所有数据存储在浏览器的 IndexedDB 中，无需担心数据丢失。
                 setIsCssVisible(true);
               }}
             />
-          ) : currentFile ? (
+          ) : currentFilePath ? (
             <MarkdownEditor 
-              key={currentFile.id}
+              key={currentFilePath}
               content={content} 
               onChange={handleContentChange}
-              currentFile={currentFile}
+              currentFilePath={currentFilePath}
               isMarkdownCollapsed={!isMarkdownVisible}
               isPreviewCollapsed={!isPreviewVisible}
               isCssCollapsed={!isCssVisible}

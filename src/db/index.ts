@@ -1,44 +1,5 @@
 import Dexie, { Table } from 'dexie';
-
-export interface IFile {
-  id?: number;
-  name: string;
-  content: string;
-  parentId: number | null;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface IFolder {
-  id?: number;
-  name: string;
-  parentId: number | null;
-  createdAt: Date;
-}
-
-export interface ITheme {
-  id?: number;
-  name: string;
-  css: string;
-  isCustom: boolean; // 是否为自定义主题
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface ISyncMetadata {
-  id?: number;
-  lastSyncTime: Date | null;
-  lastSyncHash: string;
-  isSyncing: boolean;
-  syncError: string | null;
-  updatedAt: Date;
-}
-
-export interface ISettings {
-  id?: number;
-  defaultTheme?: string;
-  updatedAt: Date;
-}
+import type { IFile, IFolder, ITheme, ISyncMetadata, ISettings } from '../types/type';
 
 export class MarkdownEditorDB extends Dexie {
   files!: Table<IFile>;

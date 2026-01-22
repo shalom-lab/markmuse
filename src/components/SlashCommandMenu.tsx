@@ -1,12 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-
-export interface Command {
-  id: string;
-  label: string;
-  icon: string;
-  keywords: string[];
-  action: () => { text: string; cursorOffset: number };
-}
+import type { Command } from '../types/type';
 
 const commands: Command[] = [
   {

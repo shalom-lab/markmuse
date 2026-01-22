@@ -1,72 +1,88 @@
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { themes, defaultThemeId, Theme } from '../themes';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../db';
+import { themes as builtInThemes, defaultThemeId } from '../themes';
+import type { Theme } from '../types/type';
 import { getSettings } from '../services/settingsStorage';
+import { listThemes, ensureBuiltInThemes } from '../storage/themeStorage';
 
 interface ThemeContextType {
   currentTheme: Theme;
   setTheme: (themeIdOrName: string) => void;
   themes: Theme[];
   applyDefaultTheme: () => Promise<void>;
+  refreshThemes: () => Promise<void>;
+  isInitialized: boolean;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [currentThemeId, setCurrentThemeId] = useState<string>(defaultThemeId);
-  const [customTheme, setCustomTheme] = useState<{ name: string; css: string } | null>(null);
+  const [currentTheme, setCurrentTheme] = useState<Theme>(builtInThemes[0]);
+  const [allThemes, setAllThemes] = useState<Theme[]>(builtInThemes); // 所有主题（从 OPFS 读取）
   const [isApplyingDefaultTheme, setIsApplyingDefaultTheme] = useState(false);
-  
-  // 获取自定义主题列表（带错误处理）
-  const customThemes = useLiveQuery(
-    () => {
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // 初始化：将内置主题导出到 OPFS，然后加载所有主题
+  useEffect(() => {
+    let mounted = true;
+
+    const init = async () => {
       try {
-        return db.themes.filter(theme => theme.isCustom === true).toArray();
+        // 1. 确保内置主题始终存在于 OPFS
+        await ensureBuiltInThemes();
+        
+        // 2. 从 OPFS 加载所有主题（包括内置的）
+        const storedThemes = await listThemes();
+        const themesFromOpfs: Theme[] = storedThemes.map(t => ({
+          id: t.id,
+          name: t.name,
+          css: t.css
+        }));
+
+        if (mounted) {
+          setAllThemes(themesFromOpfs);
+          setIsInitialized(true);
+          
+          // 3. 应用默认主题
+          const settings = await getSettings();
+          const themeToApply = settings.defaultTheme || defaultThemeId;
+          await applyTheme(themeToApply, themesFromOpfs);
+        }
       } catch (error) {
-        console.error('获取自定义主题列表失败:', error);
-        return [];
+        console.error('初始化主题失败:', error);
+        // Fallback：使用代码中的内置主题
+        if (mounted) {
+          setAllThemes(builtInThemes);
+          setIsInitialized(true);
+          setCurrentTheme(builtInThemes.find(t => t.id === defaultThemeId) || builtInThemes[0]);
+        }
       }
-    },
-    []
-  );
-  
-  // 确定当前主题
-  const currentTheme: Theme = (() => {
-    // 如果设置了自定义主题，使用自定义主题
-    if (customTheme) {
-      return {
-        id: customTheme.name,
-        name: customTheme.name,
-        css: customTheme.css
-      };
-    }
-    // 否则使用内置主题
-    return themes.find(t => t.id === currentThemeId) || themes[0];
-  })();
-  
-  const setTheme = (themeIdOrName: string) => {
-    // 先检查是否是内置主题
-    const builtInTheme = themes.find(t => t.id === themeIdOrName);
-    if (builtInTheme) {
-      setCurrentThemeId(themeIdOrName);
-      setCustomTheme(null);
+    };
+
+    init();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // 应用主题（从 OPFS 主题列表中查找）
+  const applyTheme = async (themeIdOrName: string, themesList: Theme[] = allThemes) => {
+    const theme = themesList.find(t => t.id === themeIdOrName || t.name === themeIdOrName);
+    if (theme) {
+      setCurrentThemeId(theme.id);
+      setCurrentTheme(theme);
       return;
     }
-    
-    // 如果不是内置主题，查找自定义主题
-    if (customThemes) {
-      const customTheme = customThemes.find(t => t.name === themeIdOrName);
-      if (customTheme) {
-        setCustomTheme({ name: customTheme.name, css: customTheme.css });
-        setCurrentThemeId(''); // 清空内置主题 ID
-        return;
-      }
-    }
-    
-    // 如果都找不到，使用默认主题
-    setCurrentThemeId(defaultThemeId);
-    setCustomTheme(null);
+
+    // 如果找不到，使用默认主题
+    const defaultTheme = themesList.find(t => t.id === defaultThemeId) || themesList[0];
+    setCurrentThemeId(defaultTheme.id);
+    setCurrentTheme(defaultTheme);
+  };
+
+  const setTheme = (themeIdOrName: string) => {
+    applyTheme(themeIdOrName);
   };
 
   // 应用默认主题（带防重复调用）
@@ -79,41 +95,53 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setIsApplyingDefaultTheme(true);
     try {
       const settings = await getSettings();
-      // 如果设置了默认主题，使用设置的；否则使用内置的默认主题
+      // 如果设置了默认主题，使用设置的；否则使用默认主题
       const themeToApply = settings.defaultTheme || defaultThemeId;
-      setTheme(themeToApply);
+      await applyTheme(themeToApply);
     } catch (error) {
       console.error('应用默认主题失败:', error);
-      // 出错时使用内置的默认主题
-      setTheme(defaultThemeId);
+      // 出错时使用默认主题
+      await applyTheme(defaultThemeId);
     } finally {
       setIsApplyingDefaultTheme(false);
     }
   };
 
-  // 初始化时应用默认主题（只执行一次）
-  useEffect(() => {
-    let mounted = true;
-    
-    const initTheme = async () => {
-      // 等待一小段时间，确保数据库初始化完成
-      await new Promise(resolve => setTimeout(resolve, 100));
+  // 刷新主题列表（当主题被创建/更新/删除后调用）
+  const refreshThemes = async () => {
+    try {
+      const storedThemes = await listThemes();
+      const themesFromOpfs: Theme[] = storedThemes.map(t => ({
+        id: t.id,
+        name: t.name,
+        css: t.css
+      }));
+      setAllThemes(themesFromOpfs);
       
-      if (mounted) {
-        await applyDefaultTheme();
+      // 如果当前主题被删除，切换到默认主题
+      const currentExists = themesFromOpfs.some(t => t.id === currentThemeId || t.name === currentTheme.name);
+      if (!currentExists) {
+        await applyTheme(defaultThemeId, themesFromOpfs);
+      } else {
+        // 刷新当前主题（可能被更新了）
+        await applyTheme(currentThemeId, themesFromOpfs);
       }
-    };
-
-    initTheme();
-
-    return () => {
-      mounted = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    } catch (error) {
+      console.error('刷新主题列表失败:', error);
+    }
+  };
 
   return (
-    <ThemeContext.Provider value={{ currentTheme, setTheme, themes, applyDefaultTheme }}>
+    <ThemeContext.Provider 
+      value={{ 
+        currentTheme, 
+        setTheme, 
+        themes: allThemes, 
+        applyDefaultTheme,
+        refreshThemes,
+        isInitialized
+      }}
+    >
       {children}
     </ThemeContext.Provider>
   );

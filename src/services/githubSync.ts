@@ -1,10 +1,16 @@
 /**
- * GitHub 同步服务
- * 处理 IndexedDB 和 GitHub 仓库之间的双向同步
+ * GitHub 同步服务（已废弃）
+ * 此服务已废弃，请使用 src/sync/syncEngine.ts 代替
+ * 保留此文件仅用于向后兼容，将在未来版本中移除
+ * 
+ * @deprecated 使用 syncEngine.ts 代替
  */
 
-import { db, IFile, IFolder } from '../db';
+// 注意：此文件已废弃，保留仅用于向后兼容
+// 如需使用 GitHub 同步，请使用 src/sync/syncEngine.ts
+import { db } from '../db'; // 保留导入以支持废弃的 API
 import { GitHubApi } from './githubApi';
+import type { IFile, IFolder } from '../types/type';
 
 interface SyncMetadata {
   lastSyncTime: Date | null;

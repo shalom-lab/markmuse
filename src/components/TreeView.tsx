@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { IFile, IFolder, db } from '../db';
 import { showToast } from '../utils/toast';
+import type { IFile, IFolder } from '../types/type';
+import { createFile, createFolder, renameFileOrFolder, pathToIFileWithContent, getIdPath } from '../storage/fileTreeService';
 
 interface TreeNode {
   id: number;
@@ -264,6 +265,7 @@ interface TreeViewProps {
   onSelectFile: (file: IFile) => void;
   onDelete: (id: number, type: 'file' | 'folder') => void;
   onFileCreated?: (file: IFile) => void;
+  onRefresh?: () => void;
 }
 
 export const TreeView: React.FC<TreeViewProps> = ({ 
@@ -272,7 +274,8 @@ export const TreeView: React.FC<TreeViewProps> = ({
   currentFileId,
   onSelectFile, 
   onDelete,
-  onFileCreated
+  onFileCreated,
+  onRefresh
 }) => {
   const [expandedFolders, setExpandedFolders] = useState<Set<number>>(new Set());
   const [editingState, setEditingState] = useState<EditingState | null>(null);
@@ -446,6 +449,51 @@ export const TreeView: React.FC<TreeViewProps> = ({
     });
   };
 
+  // 根据 id 找到对应的路径
+  const findPathById = (id: number, type: 'file' | 'folder'): string | null => {
+    // 先从映射中查找
+    const path = getIdPath(id);
+    if (path) return path;
+    
+    // 如果映射中没有，从 files/folders 中查找（需要递归构建完整路径）
+    if (type === 'file') {
+      const file = files.find(f => f.id === id);
+      if (file) {
+        // 构建完整路径（需要从根目录开始）
+        const buildPath = (file: IFile): string => {
+          if (file.parentId === null) {
+            return file.name;
+          }
+          const parentFolder = folders.find(f => f.id === file.parentId);
+          if (parentFolder) {
+            // 递归查找父文件夹路径
+            const parentPath = findPathById(file.parentId, 'folder');
+            return parentPath ? `${parentPath}/${file.name}` : file.name;
+          }
+          return file.name;
+        };
+        return buildPath(file);
+      }
+    } else {
+      const folder = folders.find(f => f.id === id);
+      if (folder) {
+        const buildPath = (folder: IFolder): string => {
+          if (folder.parentId === null) {
+            return folder.name;
+          }
+          const parentFolder = folders.find(f => f.id === folder.parentId);
+          if (parentFolder) {
+            const parentPath = buildPath(parentFolder);
+            return `${parentPath}/${folder.name}`;
+          }
+          return folder.name;
+        };
+        return buildPath(folder);
+      }
+    }
+    return null;
+  };
+
   const handleSaveEdit = async (state: EditingState, newName: string) => {
     // 清理文件名，移除可能的.md后缀
     const cleanName = newName.trim().replace(/\.md$/i, '');
@@ -457,140 +505,117 @@ export const TreeView: React.FC<TreeViewProps> = ({
     try {
       if (state.type === 'create') {
         if (state.nodeType === 'file') {
-          // 从数据库重新查询，确保获取最新的文件列表
-          const allFiles = await db.files.toArray();
-          // 检查同一文件夹下是否有同名文件
-          const existingFiles = allFiles.filter(f => 
-            f.parentId === state.parentId && 
-            f.name.toLowerCase() === `${cleanName}.md`.toLowerCase()
-          );
-          if (existingFiles.length > 0) {
-            showToast(`文件名 "${cleanName}.md" 已存在，请使用其他名称`, { type: 'warning' });
-            // 不清除编辑状态，让用户继续编辑
-            return;
-          }
-
-          const newFile = {
-            name: `${cleanName}.md`,
-            content: '',
-            parentId: state.parentId,
-            createdAt: new Date(),
-            updatedAt: new Date()
-          };
-          const id = await db.files.add(newFile);
-          const createdFile: IFile = { ...newFile, id: id as number };
+          // 找到父路径
+          const parentPath = state.parentId !== null ? findPathById(state.parentId, 'folder') : null;
           
-          // 确保父文件夹已展开
-          if (state.parentId !== null) {
-            setExpandedFolders(prev => {
-              const newSet = new Set(prev);
-              newSet.add(state.parentId!);
-              return newSet;
-            });
-          }
-          
-          // 等待一下确保数据库更新完成
-          await new Promise(resolve => setTimeout(resolve, 100));
-          
-          // 清除编辑状态
-          setEditingState(null);
-          
-          if (onFileCreated) {
-            onFileCreated(createdFile);
+          try {
+            const newPath = await createFile(parentPath, cleanName);
+            const createdFile = await pathToIFileWithContent(newPath);
+            
+            // 确保父文件夹已展开
+            if (state.parentId !== null) {
+              setExpandedFolders(prev => {
+                const newSet = new Set(prev);
+                newSet.add(state.parentId!);
+                return newSet;
+              });
+            }
+            
+            // 清除编辑状态
+            setEditingState(null);
+            
+            if (onFileCreated) {
+              onFileCreated(createdFile);
+            }
+            
+            // 刷新文件树
+            if (onRefresh) {
+              onRefresh();
+            }
+          } catch (error: any) {
+            if (error.message?.includes('已存在') || error.message?.includes('.themes')) {
+              showToast(error.message, { type: 'warning' });
+              setEditingState(null);
+              return;
+            }
+            showToast(error.message || '创建文件失败', { type: 'error' });
+            setEditingState(null);
           }
         } else {
-          // 从数据库重新查询，确保获取最新的文件夹列表
-          const allFolders = await db.folders.toArray();
-          // 检查同一文件夹下是否有同名文件夹
-          const existingFolders = allFolders.filter(f => 
-            f.parentId === state.parentId && 
-            f.name === cleanName
-          );
-          if (existingFolders.length > 0) {
-            showToast(`文件夹名 "${cleanName}" 已存在，请使用其他名称`, { type: 'warning' });
-            // 不清除编辑状态，让用户继续编辑
-            return;
-          }
-
-          const folderId = await db.folders.add({
-            name: cleanName,
-            parentId: state.parentId,
-            createdAt: new Date()
-          });
+          // 找到父路径
+          const parentPath = state.parentId !== null ? findPathById(state.parentId, 'folder') : null;
           
-          // 确保父文件夹已展开，并展开新创建的文件夹
-          if (state.parentId !== null) {
+          try {
+            const newPath = await createFolder(parentPath, cleanName);
+            const folderId = newPath.split('').reduce((a, b) => { a = ((a << 5) - a) + b.charCodeAt(0); return a & a; }, 0);
+            
+            // 确保父文件夹已展开，并展开新创建的文件夹
+            if (state.parentId !== null) {
+              setExpandedFolders(prev => {
+                const newSet = new Set(prev);
+                newSet.add(state.parentId!);
+                return newSet;
+              });
+            }
+            // 展开新创建的文件夹
             setExpandedFolders(prev => {
               const newSet = new Set(prev);
-              newSet.add(state.parentId!);
+              newSet.add(folderId);
               return newSet;
             });
+            
+            // 清除编辑状态
+            setEditingState(null);
+            
+            // 刷新文件树
+            if (onRefresh) {
+              onRefresh();
+            }
+          } catch (error: any) {
+            if (error.message?.includes('已存在') || error.message?.includes('.themes')) {
+              showToast(error.message, { type: 'warning' });
+              setEditingState(null);
+              return;
+            }
+            showToast(error.message || '创建文件夹失败', { type: 'error' });
+            setEditingState(null);
           }
-          // 展开新创建的文件夹
-          setExpandedFolders(prev => {
-            const newSet = new Set(prev);
-            newSet.add(folderId as number);
-            return newSet;
-          });
-          
-          // 等待一下确保数据库更新完成，useLiveQuery 能够响应
-          await new Promise(resolve => setTimeout(resolve, 150));
-          
-          // 清除编辑状态
-          setEditingState(null);
         }
       } else if (state.type === 'rename') {
-        if (state.nodeType === 'file') {
-          // 从数据库重新查询，确保获取最新的文件列表
-          const allFiles = await db.files.toArray();
-          const file = allFiles.find(f => f.id === state.nodeId);
-          if (file) {
-            // 检查同一文件夹下是否有同名文件（排除自己）
-            const existingFiles = allFiles.filter(f => 
-              f.id !== state.nodeId &&
-              f.parentId === file.parentId && 
-              f.name.toLowerCase() === `${cleanName}.md`.toLowerCase()
-            );
-            if (existingFiles.length > 0) {
-              showToast(`文件名 "${cleanName}.md" 已存在，请使用其他名称`, { type: 'warning' });
-              return;
-            }
-
-            await db.files.update(state.nodeId, {
-              name: `${cleanName}.md`,
-              updatedAt: new Date()
-            });
-            // 如果重命名的是当前文件，需要更新
-            if (currentFileId === state.nodeId && onFileCreated) {
-              const updatedFile: IFile = { ...file, id: file.id!, name: `${cleanName}.md` };
-              onFileCreated(updatedFile);
-            }
+        const nodeId = typeof state.nodeId === 'number' ? state.nodeId : parseInt(state.nodeId.toString());
+        const oldPath = findPathById(nodeId, state.nodeType);
+        if (!oldPath) {
+          showToast('找不到要重命名的项目', { type: 'error' });
+          return;
+        }
+        
+        try {
+          const newNameWithExt = state.nodeType === 'file' ? `${cleanName}.md` : cleanName;
+          const newPath = await renameFileOrFolder(oldPath, newNameWithExt);
+          
+          // 如果重命名的是当前文件，需要更新
+          if (currentFileId === state.nodeId && state.nodeType === 'file' && onFileCreated) {
+            const updatedFile = await pathToIFileWithContent(newPath);
+            onFileCreated(updatedFile);
           }
-        } else {
-          // 从数据库重新查询，确保获取最新的文件夹列表
-          const allFolders = await db.folders.toArray();
-          const folder = allFolders.find(f => f.id === state.nodeId);
-          if (folder) {
-            // 检查同一文件夹下是否有同名文件夹（排除自己）
-            const existingFolders = allFolders.filter(f => 
-              f.id !== state.nodeId &&
-              f.parentId === folder.parentId && 
-              f.name === cleanName
-            );
-            if (existingFolders.length > 0) {
-              showToast(`文件夹名 "${cleanName}" 已存在，请使用其他名称`, { type: 'warning' });
-              return;
-            }
+          
+          // 清除编辑状态
+          setEditingState(null);
+          
+          // 刷新文件树
+          if (onRefresh) {
+            onRefresh();
           }
-
-          await db.folders.update(state.nodeId, {
-            name: cleanName
-          });
+        } catch (error: any) {
+          if (error.message?.includes('已存在') || error.message?.includes('themes')) {
+            showToast(error.message, { type: 'warning' });
+            setEditingState(null);
+            return;
+          }
+          showToast(error.message || '重命名失败', { type: 'error' });
+          setEditingState(null);
         }
       }
-      
-      // 清除编辑状态
-      setEditingState(null);
     } catch (error) {
       console.error('保存失败:', error);
       showToast('保存失败，请重试', { type: 'error' });

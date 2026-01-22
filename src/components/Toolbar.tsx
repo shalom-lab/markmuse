@@ -1,8 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import Logo from './Logo';
 import { useTheme } from '../contexts/ThemeContext';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../db';
 
 interface FormatItem {
   label: string;
@@ -44,9 +42,6 @@ export default function Toolbar({
   const menuRef = useRef<HTMLDivElement>(null);
   const viewMenuRef = useRef<HTMLDivElement>(null);
   const formatMenuRef = useRef<HTMLDivElement>(null);
-  
-  // 获取自定义主题列表
-  const customThemes = useLiveQuery(() => db.themes.filter(theme => theme.isCustom === true).toArray());
 
   // 格式功能列表
   const formatItems: FormatItem[] = [
@@ -212,35 +207,9 @@ export default function Toolbar({
                   </button>
                 ))}
                 
-                {/* 分割线 */}
-                {customThemes && customThemes.length > 0 && (
-                  <>
-                    <div className="border-t border-gray-200 my-1"></div>
-                    {/* 自定义主题 */}
-                    {customThemes.map((theme) => {
-                      const isActive = currentTheme.name === theme.name;
-                      return (
-                        <button
-                          key={theme.id}
-                          onClick={() => {
-                            // 切换到自定义主题
-                            setTheme(theme.name);
-                            setIsThemeMenuOpen(false);
-                          }}
-                          className={`w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center justify-between ${
-                            isActive ? 'bg-blue-50 text-blue-600' : ''
-                          }`}
-                        >
-                          <span>{theme.name}</span>
-                          {isActive && (
-                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                            </svg>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </>
+                {/* 分割线 - 如果有多个主题，显示分割线 */}
+                {themes.length > 4 && (
+                  <div className="border-t border-gray-200 my-1"></div>
                 )}
                 
                 {/* 分割线 */}

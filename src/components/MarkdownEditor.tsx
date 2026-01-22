@@ -7,13 +7,12 @@ import { css } from '@codemirror/lang-css';
 import { oneDark } from '@codemirror/theme-one-dark';
 import Sidebar from './Sidebar';
 import { useTheme } from '../contexts/ThemeContext';
-import SlashCommandMenu, { Command } from './SlashCommandMenu';
+import SlashCommandMenu from './SlashCommandMenu';
+import type { Command } from '../types/type';
 import { Dialog } from './Dialog';
 import { showToast } from '../utils/toast';
 import EmojiPicker from './EmojiPicker';
-import { IFile, db } from '../db';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { createTheme, updateTheme, deleteTheme, themeNameExists } from '../db/themeService';
+import { createTheme, updateTheme, deleteTheme, validateThemeId } from '../storage/themeStorage';
 // 导入 highlight.js 的样式
 import 'highlight.js/styles/github-dark.css';
 // 导入 KaTeX 的样式
@@ -22,7 +21,7 @@ import 'katex/dist/katex.min.css';
 interface Props {
   content: string;
   onChange: (content: string) => void;
-  currentFile?: IFile | null;
+  currentFilePath?: string | null;
   isMarkdownCollapsed: boolean;
   isPreviewCollapsed: boolean;
   isCssCollapsed: boolean;
@@ -32,7 +31,7 @@ interface Props {
 export default function MarkdownEditor({ 
   content, 
   onChange,
-  currentFile,
+  currentFilePath,
   isMarkdownCollapsed,
   isPreviewCollapsed,
   isCssCollapsed,
@@ -59,8 +58,9 @@ export default function MarkdownEditor({
   const [showThemeMenu, setShowThemeMenu] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [saveMode, setSaveMode] = useState<'update' | 'new'>('update');
-  const [newThemeName, setNewThemeName] = useState('');
-  const [currentThemeId, setCurrentThemeId] = useState<number | null>(null);
+  const [newThemeId, setNewThemeId] = useState(''); // 主题 ID（英文）
+  const [newThemeName, setNewThemeName] = useState(''); // 主题名称（中文）
+  const [currentThemeId, setCurrentThemeId] = useState<string | null>(null);
   const themeMenuRef = useRef<HTMLDivElement>(null);
   const [dialog, setDialog] = useState<{
     isOpen: boolean;
@@ -97,55 +97,24 @@ export default function MarkdownEditor({
   }));
 
   const [customCss, setCustomCss] = useState(currentTheme.css);
+  const { refreshThemes } = useTheme();
   
-  // 获取自定义主题列表
-  const customThemes = useLiveQuery(() => db.themes.filter(theme => theme.isCustom === true).toArray());
-  
-  // 检查当前主题是否为自定义主题
-  const isCurrentThemeCustom = useMemo(() => {
-    if (!customThemes) return false;
-    return customThemes.some(t => t.name === currentTheme.name);
-  }, [customThemes, currentTheme.name]);
-  
-  // 获取当前主题的数据库 ID
+  // 获取当前主题的 ID（用于更新/删除）
   useEffect(() => {
-    if (isCurrentThemeCustom && customThemes) {
-      const theme = customThemes.find(t => t.name === currentTheme.name);
-      if (theme?.id) {
-        setCurrentThemeId(theme.id);
-      }
-    } else {
-      setCurrentThemeId(null);
-    }
-  }, [isCurrentThemeCustom, customThemes, currentTheme.name]);
+    // 当前主题的 ID 就是 currentTheme.id（字符串）
+    setCurrentThemeId(currentTheme.id || null);
+  }, [currentTheme.id]);
   
   // 检查CSS是否有变化
   const hasCssChanged = useMemo(() => {
     return customCss !== currentTheme.css;
   }, [customCss, currentTheme.css]);
   
-  // 获取所有文件夹用于路径计算
-  const folders = useLiveQuery(() => db.folders.toArray()) || [];
-  
-  // 计算文件路径
+  // 计算文件路径（显示用）
   const filePath = useMemo(() => {
-    if (!currentFile) return '';
-    
-    const pathParts: string[] = [currentFile.name];
-    let parentId = currentFile.parentId;
-    
-    while (parentId !== null) {
-      const folder = folders.find(f => f.id === parentId);
-      if (folder) {
-        pathParts.unshift(folder.name);
-        parentId = folder.parentId;
-      } else {
-        break;
-      }
-    }
-    
-    return pathParts.join(' / ');
-  }, [currentFile, folders]);
+    if (!currentFilePath) return '';
+    return currentFilePath;
+  }, [currentFilePath]);
 
   // 更新预览
   const updatePreview = () => {
@@ -602,34 +571,45 @@ export default function MarkdownEditor({
   // 处理保存样式
   const handleSaveTheme = async () => {
     if (saveMode === 'new') {
-      // 另存为新主题
-      if (!newThemeName.trim()) {
+      // 另存为新主题：需要输入 ID 和名称
+      const trimmedId = newThemeId.trim();
+      const trimmedName = newThemeName.trim();
+      
+      if (!trimmedId) {
+        showToast('请输入主题 ID', { type: 'warning' });
+        return;
+      }
+      
+      if (!trimmedName) {
         showToast('请输入主题名称', { type: 'warning' });
         return;
       }
       
-      const exists = await themeNameExists(newThemeName.trim());
-      if (exists) {
-        showToast('主题名称已存在，请使用其他名称', { type: 'warning' });
+      // 验证 ID 格式
+      const idValidation = validateThemeId(trimmedId);
+      if (!idValidation.valid) {
+        showToast(idValidation.error || '主题 ID 格式不正确', { type: 'warning' });
         return;
       }
       
       try {
-        await createTheme(newThemeName.trim(), customCss);
+        const newTheme = await createTheme(trimmedId, trimmedName, customCss);
         setShowSaveModal(false);
+        setNewThemeId('');
         setNewThemeName('');
         setSaveMode('update');
         showToast('主题已保存', { type: 'success' });
-        // 刷新页面以加载新主题（后续可以优化为动态更新）
-        setTimeout(() => window.location.reload(), 1000);
-      } catch (error) {
+        // 刷新主题列表并切换到新主题
+        await refreshThemes();
+        setTheme(newTheme.id);
+      } catch (error: any) {
         console.error('保存主题失败:', error);
-        showToast('保存主题失败，请重试', { type: 'error' });
+        showToast(error.message || '保存主题失败，请重试', { type: 'error' });
       }
     } else {
-      // 更新当前主题（仅自定义主题支持）
-      if (!isCurrentThemeCustom || !currentThemeId) {
-        showToast('内置主题不支持直接更新，请使用"另存为新主题"功能', { type: 'warning' });
+      // 更新当前主题（所有主题都支持更新，因为都在 OPFS 中）
+      if (!currentThemeId) {
+        showToast('无法更新主题：主题 ID 不存在', { type: 'warning' });
         return;
       }
       
@@ -638,8 +618,9 @@ export default function MarkdownEditor({
         setShowSaveModal(false);
         setSaveMode('update');
         showToast('主题已更新', { type: 'success' });
-        // 更新当前主题的 CSS
-        setTheme(currentTheme.id); // 触发主题更新
+        // 刷新主题列表并更新当前主题
+        await refreshThemes();
+        setTheme(currentThemeId); // 触发主题更新
       } catch (error) {
         console.error('更新主题失败:', error);
         showToast('更新主题失败，请重试', { type: 'error' });
@@ -650,7 +631,7 @@ export default function MarkdownEditor({
   // 处理删除当前样式
   const handleDeleteCurrent = async () => {
     if (!currentThemeId) {
-      showToast('当前主题不是自定义主题，无法删除', { type: 'warning' });
+      showToast('无法删除主题：主题 ID 不存在', { type: 'warning' });
       return;
     }
     
@@ -666,9 +647,10 @@ export default function MarkdownEditor({
           setDialog({ isOpen: false, title: '', message: '' });
           showToast('主题已删除', { type: 'success' });
           setShowThemeMenu(false);
+          // 刷新主题列表
+          await refreshThemes();
           // 切换到默认主题
           setTheme('default');
-          setTimeout(() => window.location.reload(), 1000); // 刷新以更新主题列表
         } catch (error) {
           console.error('删除主题失败:', error);
           setDialog({ isOpen: false, title: '', message: '' });
@@ -701,15 +683,16 @@ export default function MarkdownEditor({
   // 当打开保存Modal时，根据当前主题设置默认模式
   useEffect(() => {
     if (showSaveModal) {
-      // 如果当前是自定义主题，默认选择更新；否则默认选择另存为新主题
-      if (isCurrentThemeCustom && currentThemeId) {
+      // 如果当前主题存在（所有主题都在 OPFS 中），默认选择更新；否则默认选择另存为新主题
+      if (currentThemeId) {
         setSaveMode('update');
       } else {
         setSaveMode('new');
       }
+      setNewThemeId('');
       setNewThemeName('');
     }
-  }, [showSaveModal, isCurrentThemeCustom, currentThemeId]);
+  }, [showSaveModal, currentThemeId]);
 
   // 应用自定义样式
   useEffect(() => {
@@ -755,7 +738,7 @@ export default function MarkdownEditor({
   return (
     <div className="h-full flex flex-col overflow-hidden relative">
       {/* 文件路径栏 */}
-      {currentFile && (
+      {currentFilePath && (
         <div className="flex-none px-4 py-2 bg-gray-50 border-b border-gray-200 flex items-center text-sm text-gray-600">
           <span className="text-gray-400 mr-2">📄</span>
           <span className="font-semibold text-gray-700">{filePath}</span>
@@ -909,7 +892,7 @@ export default function MarkdownEditor({
                 </button>
                 {showThemeMenu && (
                   <div className="absolute top-full right-0 mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-50">
-                    {isCurrentThemeCustom && currentThemeId && (
+                    {currentThemeId && (
                       <button
                         onClick={() => {
                           handleDeleteCurrent();
@@ -985,8 +968,8 @@ export default function MarkdownEditor({
             <div className="px-6 py-4">
               {/* Checkbox 选择 - 二选一（互斥） */}
               <div className="space-y-3 mb-4">
-                {/* 更新主题选项 - 仅自定义主题显示 */}
-                {isCurrentThemeCustom && currentThemeId ? (
+                {/* 更新主题选项 - 所有主题都支持更新 */}
+                {currentThemeId ? (
                   <label 
                     className="flex items-center cursor-pointer p-3 rounded-lg border-2 transition-colors hover:bg-gray-50"
                     style={{
@@ -1047,32 +1030,77 @@ export default function MarkdownEditor({
                 </label>
               </div>
 
-              {/* 新主题名称输入框 - 仅在选择"另存为新主题"时显示 */}
+              {/* 新主题输入框 - 仅在选择"另存为新主题"时显示 */}
               {saveMode === 'new' && (
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    主题名称 <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={newThemeName}
-                    onChange={(e) => setNewThemeName(e.target.value)}
-                    placeholder="请输入新主题名称"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                    autoFocus
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && newThemeName.trim()) {
-                        handleSaveTheme();
-                      } else if (e.key === 'Escape') {
-                        setShowSaveModal(false);
-                        setNewThemeName('');
-                        setSaveMode('update');
-                      }
-                    }}
-                  />
-                  {saveMode === 'new' && !newThemeName.trim() && (
-                    <p className="mt-1 text-xs text-red-500">请输入主题名称</p>
-                  )}
+                <div className="mb-4 space-y-4">
+                  {/* 主题 ID 输入框 */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      主题 ID <span className="text-red-500">*</span>
+                      <span className="ml-2 text-xs text-gray-500 font-normal">(英文、数字、-、_)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={newThemeId}
+                      onChange={(e) => {
+                        // 只允许输入英文、数字、-、_
+                        const value = e.target.value.replace(/[^a-zA-Z0-9_-]/g, '');
+                        setNewThemeId(value);
+                      }}
+                      placeholder="例如: wechat-simple"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors font-mono text-sm"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && newThemeId.trim() && newThemeName.trim()) {
+                          handleSaveTheme();
+                        } else if (e.key === 'Escape') {
+                          setShowSaveModal(false);
+                          setNewThemeId('');
+                          setNewThemeName('');
+                          setSaveMode('update');
+                        } else if (e.key === 'Tab' && newThemeId.trim() && !newThemeName.trim()) {
+                          // Tab 键时，如果 ID 已填，聚焦到名称输入框
+                          e.preventDefault();
+                          const nameInput = document.querySelector('input[placeholder="例如: 简洁微信风"]') as HTMLInputElement;
+                          nameInput?.focus();
+                        }
+                      }}
+                    />
+                    {saveMode === 'new' && newThemeId && !/^[a-zA-Z0-9_-]+$/.test(newThemeId) && (
+                      <p className="mt-1 text-xs text-red-500">主题 ID 只能包含英文、数字、连字符(-)和下划线(_)</p>
+                    )}
+                    {saveMode === 'new' && !newThemeId.trim() && (
+                      <p className="mt-1 text-xs text-red-500">请输入主题 ID</p>
+                    )}
+                  </div>
+
+                  {/* 主题名称输入框 */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      主题名称 <span className="text-red-500">*</span>
+                      <span className="ml-2 text-xs text-gray-500 font-normal">(中文/任意)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={newThemeName}
+                      onChange={(e) => setNewThemeName(e.target.value)}
+                      placeholder="例如: 简洁微信风"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && newThemeId.trim() && newThemeName.trim()) {
+                          handleSaveTheme();
+                        } else if (e.key === 'Escape') {
+                          setShowSaveModal(false);
+                          setNewThemeId('');
+                          setNewThemeName('');
+                          setSaveMode('update');
+                        }
+                      }}
+                    />
+                    {saveMode === 'new' && !newThemeName.trim() && (
+                      <p className="mt-1 text-xs text-red-500">请输入主题名称</p>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -1082,6 +1110,7 @@ export default function MarkdownEditor({
               <button
                 onClick={() => {
                   setShowSaveModal(false);
+                  setNewThemeId('');
                   setNewThemeName('');
                   setSaveMode('update');
                 }}
@@ -1091,9 +1120,9 @@ export default function MarkdownEditor({
               </button>
               <button
                 onClick={handleSaveTheme}
-                disabled={saveMode === 'new' && !newThemeName.trim()}
+                disabled={saveMode === 'new' && (!newThemeId.trim() || !newThemeName.trim() || !/^[a-zA-Z0-9_-]+$/.test(newThemeId))}
                 className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                  saveMode === 'new' && !newThemeName.trim()
+                  saveMode === 'new' && (!newThemeId.trim() || !newThemeName.trim() || !/^[a-zA-Z0-9_-]+$/.test(newThemeId))
                     ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                     : 'bg-blue-600 text-white hover:bg-blue-700'
                 }`}

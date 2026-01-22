@@ -1,9 +1,5 @@
 // 主题配置
-export interface Theme {
-  id: string;
-  name: string;
-  css: string;
-}
+import type { Theme } from '../types/type';
 
 export const themes: Theme[] = [
   {
