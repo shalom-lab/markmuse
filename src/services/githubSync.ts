@@ -8,9 +8,27 @@
 
 // 注意：此文件已废弃，保留仅用于向后兼容
 // 如需使用 GitHub 同步，请使用 src/sync/syncEngine.ts
-import { db } from '../db'; // 保留导入以支持废弃的 API
+// import { db } from '../db'; // 已移除 Dexie 依赖
 import { GitHubApi } from './githubApi';
-import type { IFile, IFolder } from '../types/type';
+// import type { IFile, IFolder } from '../types/type'; // 已移除，使用 FileTreeNode 代替
+
+// 占位符类型（此文件已废弃）
+interface IFile {
+  id?: number;
+  name: string;
+  content: string;
+  parentId: number | null;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+interface IFolder {
+  id?: number;
+  name: string;
+  parentId: number | null;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
 
 interface SyncMetadata {
   lastSyncTime: Date | null;
@@ -144,7 +162,8 @@ export class GitHubSync {
     }
 
     // 重新获取最新的文件夹列表（因为可能已经创建了新文件夹）
-    const allFolders = await db.folders.toArray();
+    // const allFolders = await db.folders.toArray(); // 已移除 Dexie
+    const allFolders: IFolder[] = []; // 占位符，此文件已废弃
     
     // 构建文件夹路径，确保父文件夹先创建
     let currentParentId: number | null = null;
@@ -161,7 +180,8 @@ export class GitHubSync {
           parentId: currentParentId,
           createdAt: new Date(),
         };
-        const id = await db.folders.add(newFolder);
+        // const id = await db.folders.add(newFolder); // 已移除 Dexie
+        const id = 0; // 占位符，此文件已废弃
         folder = { ...newFolder, id: id as number };
         // 添加到列表以便后续查找
         allFolders.push(folder);
@@ -188,7 +208,8 @@ export class GitHubSync {
       };
 
       // 获取本地文件夹结构（用于构建路径）
-      const localFolders = await db.folders.toArray();
+      // const localFolders = await db.folders.toArray(); // 已移除 Dexie
+      const localFolders: IFolder[] = []; // 占位符，此文件已废弃
 
       // 获取远程文件列表（包含路径和文件信息）
       interface RemoteFileInfo {
@@ -258,7 +279,8 @@ export class GitHubSync {
         );
 
         // 重新获取本地文件列表（因为可能已经更新）
-        const currentLocalFiles = await db.files.toArray();
+        // const currentLocalFiles = await db.files.toArray(); // 已移除 Dexie
+        const currentLocalFiles: IFile[] = []; // 占位符，此文件已废弃
         
         // 查找本地文件（通过文件名和父文件夹）
         const localFile = currentLocalFiles.find(
@@ -272,22 +294,22 @@ export class GitHubSync {
           const shouldUpdate = true; // 简化：总是更新（实际应该比较 SHA 或时间戳）
           
           if (shouldUpdate) {
-            await db.files.update(localFile.id!, {
-              content: remoteFileInfo.content,
-              updatedAt: new Date(),
-            });
+            // await db.files.update(localFile.id!, { // 已移除 Dexie
+            //   content: remoteFileInfo.content,
+            //   updatedAt: new Date(),
+            // });
             stats.filesUpdated++;
           }
         } else {
           // 创建新文件
-          const newFile: IFile = {
-            name: fileName,
-            content: remoteFileInfo.content,
-            parentId,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          };
-          await db.files.add(newFile);
+          // const newFile: IFile = { // 已移除 Dexie
+          //   name: fileName,
+          //   content: remoteFileInfo.content,
+          //   parentId,
+          //   createdAt: new Date(),
+          //   updatedAt: new Date(),
+          // };
+          // await db.files.add(newFile);
           stats.filesAdded++;
         }
       }
@@ -297,32 +319,33 @@ export class GitHubSync {
       // 用户可以在设置中选择是否同步删除操作
 
       // 同步主题
-      for (const remoteThemeInfo of remoteThemes) {
-        const remotePath = remoteThemeInfo.path;
-        const themeName = remotePath
-          .replace(`${this.themesBasePath}/`, '')
-          .replace('.css', '');
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      for (const _remoteThemeInfo of remoteThemes) {
+        // const remotePath = remoteThemeInfo.path; // 已移除 Dexie
+        // const themeName = remotePath // 已移除 Dexie
+        //   .replace(`${this.themesBasePath}/`, '')
+        //   .replace('.css', '');
 
         // 重新获取本地主题列表
-        const currentLocalThemes = await db.themes.filter(t => t.isCustom === true).toArray();
-        const localTheme = currentLocalThemes.find(t => t.name === themeName);
+        // const currentLocalThemes = await db.themes.filter(t => t.isCustom === true).toArray(); // 已移除 Dexie
+        // const localTheme = currentLocalThemes.find(t => t.name === themeName);
 
-        if (localTheme) {
-          await db.themes.update(localTheme.id!, {
-            css: remoteThemeInfo.content,
-            updatedAt: new Date(),
-          });
-          stats.themesUpdated++;
-        } else {
-          await db.themes.add({
-            name: themeName,
-            css: remoteThemeInfo.content,
-            isCustom: true,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          });
-          stats.themesAdded++;
-        }
+        // if (localTheme) {
+        //   await db.themes.update(localTheme.id!, { // 已移除 Dexie
+        //     css: remoteThemeInfo.content,
+        //     updatedAt: new Date(),
+        //   });
+        //   stats.themesUpdated++;
+        // } else {
+        //   await db.themes.add({ // 已移除 Dexie
+        //     name: themeName,
+        //     css: remoteThemeInfo.content,
+        //     isCustom: true,
+        //     createdAt: new Date(),
+        //     updatedAt: new Date(),
+        //   });
+        //   stats.themesAdded++;
+        // }
       }
 
       // 更新元数据
@@ -377,9 +400,12 @@ export class GitHubSync {
       };
 
       // 获取本地数据
-      const localFiles = await db.files.toArray();
-      const localFolders = await db.folders.toArray();
-      const localThemes = await db.themes.filter(t => t.isCustom === true).toArray();
+      // const localFiles = await db.files.toArray(); // 已移除 Dexie
+      const localFiles: IFile[] = []; // 占位符，此文件已废弃
+      // const localFolders = await db.folders.toArray(); // 已移除 Dexie
+      const localFolders: IFolder[] = []; // 占位符，此文件已废弃
+      // const localThemes = await db.themes.filter(t => t.isCustom === true).toArray(); // 已移除 Dexie
+      const localThemes: any[] = []; // 占位符，此文件已废弃
 
       // 推送文件（按文件夹层级排序，确保父文件夹先创建）
       // 先按 parentId 排序，null 的在前（根目录文件）

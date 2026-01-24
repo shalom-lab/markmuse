@@ -2,25 +2,41 @@
 
 import { listAllEntries, readTextFile, writeTextFile, deleteFile, createDirectory, deleteDirectory, renameEntry } from './opfsFs';
 import type { FileTreeNode } from '../types/type';
+import { FILES_DIR, THEMES_DIR } from '../types/type';
+import { toPhysicalPath, toLogicalPath } from './pathUtils';
+import { getFileBaseline, updateFileBaseline, removeFileBaseline } from './syncBaseline';
 
-// 构建文件树结构
+// 构建文件树结构（只处理 files/ 目录下的文件）
 export async function buildFileTree(): Promise<FileTreeNode[]> {
   const entries = await listAllEntries();
   
-  // 过滤掉 .themes 目录（主题单独管理，隐藏文件夹）
-  const fileEntries = entries.filter(e => !(e.path === '.themes' || e.path.startsWith('.themes/')));
+  // 只处理 files/ 目录下的文件，过滤掉 .themes 目录
+  const fileEntries = entries.filter(e => {
+    const path = e.path;
+    // 排除主题目录
+    if (path === THEMES_DIR || path.startsWith(`${THEMES_DIR}/`)) {
+      return false;
+    }
+    // 只处理 files/ 目录下的文件
+    return path.startsWith(`${FILES_DIR}/`) || path === FILES_DIR;
+  });
   
   // 构建树结构
   const nodeMap = new Map<string, FileTreeNode>();
   const rootNodes: FileTreeNode[] = [];
   
-  // 先创建所有节点
+  // 先创建所有节点（使用逻辑路径）
   for (const entry of fileEntries) {
-    const parts = entry.path.split('/').filter(Boolean);
+    // 跳过 files 目录本身
+    if (entry.path === FILES_DIR) continue;
+    
+    // 转换为逻辑路径
+    const logicalPath = toLogicalPath(entry.path);
+    const parts = logicalPath.split('/').filter(Boolean);
     const name = parts[parts.length - 1] || '';
     
-    nodeMap.set(entry.path, {
-      path: entry.path,
+    nodeMap.set(logicalPath, {
+      path: logicalPath,
       name,
       type: entry.isDirectory ? 'folder' : 'file',
       children: entry.isDirectory ? [] : undefined
@@ -28,11 +44,8 @@ export async function buildFileTree(): Promise<FileTreeNode[]> {
   }
   
   // 构建父子关系
-  for (const entry of fileEntries) {
-    const node = nodeMap.get(entry.path);
-    if (!node) continue;
-    
-    const parts = entry.path.split('/').filter(Boolean);
+  for (const [logicalPath, node] of nodeMap.entries()) {
+    const parts = logicalPath.split('/').filter(Boolean);
     if (parts.length === 1) {
       // 根节点
       rootNodes.push(node);
@@ -68,55 +81,63 @@ export async function buildFileTree(): Promise<FileTreeNode[]> {
   return sortNodes(rootNodes);
 }
 
-// 获取文件内容
-export async function getFileContent(path: string): Promise<string | null> {
-  return await readTextFile(path);
+// 获取文件内容（接收逻辑路径）
+export async function getFileContent(logicalPath: string): Promise<string | null> {
+  const physicalPath = toPhysicalPath(logicalPath);
+  return await readTextFile(physicalPath);
 }
 
-// 保存文件内容
-export async function saveFileContent(path: string, content: string): Promise<void> {
-  await writeTextFile(path, content);
+// 保存文件内容（接收逻辑路径）
+export async function saveFileContent(logicalPath: string, content: string): Promise<void> {
+  const physicalPath = toPhysicalPath(logicalPath);
+  await writeTextFile(physicalPath, content);
 }
 
-// 创建新文件
-export async function createFile(parentPath: string | null, fileName: string): Promise<string> {
-  const fullPath = parentPath ? `${parentPath}/${fileName}.md` : `${fileName}.md`;
+// 创建新文件（接收完整逻辑路径，如 "foo/bar.md"）
+export async function createFile(fullPath: string): Promise<string> {
+  // 确保是 .md 文件
+  if (!fullPath.endsWith('.md')) {
+    fullPath = `${fullPath}.md`;
+  }
+  
+  const physicalPath = toPhysicalPath(fullPath);
   
   // 检查文件是否已存在
-  const existing = await readTextFile(fullPath);
+  const existing = await readTextFile(physicalPath);
   if (existing !== null) {
-    throw new Error(`文件 "${fileName}.md" 已存在`);
+    throw new Error(`文件 "${fullPath}" 已存在`);
   }
   
   // 确保父目录存在
-  if (parentPath) {
-    await createDirectory(parentPath);
+  const parts = fullPath.split('/').filter(Boolean);
+  if (parts.length > 1) {
+    const parentLogicalPath = parts.slice(0, -1).join('/');
+    const parentPhysicalPath = toPhysicalPath(parentLogicalPath);
+    await createDirectory(parentPhysicalPath);
+  } else {
+    // 确保 files 目录存在
+    await createDirectory(FILES_DIR);
   }
   
   // 创建空文件
-  await writeTextFile(fullPath, '');
+  await writeTextFile(physicalPath, '');
   
   return fullPath;
 }
 
-// 创建新文件夹
-export async function createFolder(parentPath: string | null, folderName: string): Promise<string> {
-  // 禁止在根目录创建名为 ".themes" 的文件夹（.themes 是系统保留的隐藏文件夹，用于存储主题）
-  if (parentPath === null && folderName === '.themes') {
-    throw new Error('不能创建名为 ".themes" 的文件夹，该名称已被系统保留用于主题管理');
-  }
-  
-  const fullPath = parentPath ? `${parentPath}/${folderName}` : folderName;
+// 创建新文件夹（接收完整逻辑路径，如 "foo/bar"）
+export async function createFolder(fullPath: string): Promise<string> {
+  const physicalPath = toPhysicalPath(fullPath);
   
   // 检查文件夹是否已存在
   try {
     const root = await (await import('./opfsFs')).getAppRootDir();
-    const parts = fullPath.split('/').filter(Boolean);
+    const parts = physicalPath.split('/').filter(Boolean);
     let dir: FileSystemDirectoryHandle = root;
     for (const part of parts) {
       dir = await dir.getDirectoryHandle(part, { create: false });
     }
-    throw new Error(`文件夹 "${folderName}" 已存在`);
+    throw new Error(`文件夹 "${fullPath}" 已存在`);
   } catch (error: any) {
     if (error.message?.includes('已存在')) {
       throw error;
@@ -125,40 +146,46 @@ export async function createFolder(parentPath: string | null, folderName: string
   }
   
   // 确保父目录存在
-  if (parentPath) {
-    await createDirectory(parentPath);
+  const parts = fullPath.split('/').filter(Boolean);
+  if (parts.length > 1) {
+    const parentLogicalPath = parts.slice(0, -1).join('/');
+    const parentPhysicalPath = toPhysicalPath(parentLogicalPath);
+    await createDirectory(parentPhysicalPath);
+  } else {
+    // 确保 files 目录存在
+    await createDirectory(FILES_DIR);
   }
   
   // 创建新目录
-  await createDirectory(fullPath);
+  await createDirectory(physicalPath);
   
   return fullPath;
 }
 
-// 删除文件
-export async function removeFile(path: string): Promise<void> {
-  await deleteFile(path);
+// 删除文件（接收逻辑路径）
+export async function removeFile(logicalPath: string): Promise<void> {
+  const physicalPath = toPhysicalPath(logicalPath);
+  await deleteFile(physicalPath);
 }
 
-// 删除文件夹（递归）
-export async function removeFolder(path: string): Promise<void> {
-  await deleteDirectory(path);
+// 删除文件夹（递归，接收逻辑路径）
+export async function removeFolder(logicalPath: string): Promise<void> {
+  const physicalPath = toPhysicalPath(logicalPath);
+  await deleteDirectory(physicalPath);
 }
 
-// 重命名文件或文件夹
-export async function renameFileOrFolder(oldPath: string, newName: string): Promise<string> {
-  const parts = oldPath.split('/').filter(Boolean);
+// 重命名文件或文件夹（接收逻辑路径）
+export async function renameFileOrFolder(oldLogicalPath: string, newName: string): Promise<string> {
+  const parts = oldLogicalPath.split('/').filter(Boolean);
   const parentPath = parts.length > 1 ? parts.slice(0, -1).join('/') : null;
-  const newPath = parentPath ? `${parentPath}/${newName}` : newName;
+  const newLogicalPath = parentPath ? `${parentPath}/${newName}` : newName;
   
-  // 禁止将文件夹重命名为 ".themes"（如果是在根目录）
-  if (parentPath === null && newName === '.themes') {
-    throw new Error('不能将文件夹重命名为 ".themes"，该名称已被系统保留用于主题管理');
-  }
+  const oldPhysicalPath = toPhysicalPath(oldLogicalPath);
+  const newPhysicalPath = toPhysicalPath(newLogicalPath);
   
   // 检查新名称是否已存在
   try {
-    const existing = await readTextFile(newPath);
+    const existing = await readTextFile(newPhysicalPath);
     if (existing !== null) {
       throw new Error(`"${newName}" 已存在`);
     }
@@ -166,7 +193,7 @@ export async function renameFileOrFolder(oldPath: string, newName: string): Prom
     if (!error.message?.includes('已存在')) {
       // 可能是目录，继续检查
       const root = await (await import('./opfsFs')).getAppRootDir();
-      const newParts = newPath.split('/').filter(Boolean);
+      const newParts = newPhysicalPath.split('/').filter(Boolean);
       let dir: FileSystemDirectoryHandle = root;
       for (const part of newParts) {
         dir = await dir.getDirectoryHandle(part, { create: false });
@@ -177,8 +204,55 @@ export async function renameFileOrFolder(oldPath: string, newName: string): Prom
     }
   }
   
-  await renameEntry(oldPath, newPath);
-  return newPath;
+  await renameEntry(oldPhysicalPath, newPhysicalPath);
+  
+  // 更新同步基线：将旧路径的基线迁移到新路径
+  const oldBaselineSha = getFileBaseline(oldLogicalPath);
+  if (oldBaselineSha) {
+    // 迁移基线到新路径
+    updateFileBaseline(newLogicalPath, oldBaselineSha);
+    // 删除旧路径的基线
+    removeFileBaseline(oldLogicalPath);
+  }
+  
+  return newLogicalPath;
 }
 
+// 清空所有文件（只清空 files/ 目录）
+export async function clearAllFiles(): Promise<void> {
+  const entries = await listAllEntries();
+  
+  // 找出所有 files/ 目录下的文件和目录
+  const filesToDelete = entries.filter(e => {
+    const path = e.path;
+    // 只处理 files/ 目录下的内容
+    return path.startsWith(`${FILES_DIR}/`) || path === FILES_DIR;
+  });
+  
+  // 删除所有文件和目录（从最深层的开始）
+  const sortedEntries = filesToDelete.sort((a, b) => {
+    const depthA = a.path.split('/').length;
+    const depthB = b.path.split('/').length;
+    return depthB - depthA; // 深度大的先删除
+  });
+  
+  for (const entry of sortedEntries) {
+    try {
+      if (entry.isDirectory) {
+        await deleteDirectory(entry.path);
+      } else {
+        await deleteFile(entry.path);
+      }
+    } catch (error) {
+      console.error(`删除失败: ${entry.path}`, error);
+    }
+  }
+  
+  // 最后删除 files 目录本身（如果存在）
+  try {
+    await deleteDirectory(FILES_DIR);
+  } catch (error) {
+    // 忽略错误，可能目录不存在或不为空
+  }
+}
 

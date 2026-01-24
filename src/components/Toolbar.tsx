@@ -1,6 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import Logo from './Logo';
 import { useTheme } from '../contexts/ThemeContext';
+import { themes as builtInThemes } from '../themes';
 
 interface FormatItem {
   label: string;
@@ -42,6 +43,15 @@ export default function Toolbar({
   const menuRef = useRef<HTMLDivElement>(null);
   const viewMenuRef = useRef<HTMLDivElement>(null);
   const formatMenuRef = useRef<HTMLDivElement>(null);
+
+  // 计算内置主题和自定义主题
+  const { builtInThemesList, customThemes } = useMemo(() => {
+    const builtInThemeIds = new Set(builtInThemes.map(t => t.id));
+    return {
+      builtInThemesList: themes.filter(t => builtInThemeIds.has(t.id)),
+      customThemes: themes.filter(t => !builtInThemeIds.has(t.id))
+    };
+  }, [themes]);
 
   // 格式功能列表
   const formatItems: FormatItem[] = [
@@ -187,7 +197,7 @@ export default function Toolbar({
             {isThemeMenuOpen && (
               <div className="absolute top-full left-0 mt-1 w-56 bg-white border border-gray-200 rounded-md shadow-lg z-50 max-h-[calc(100vh-100px)] overflow-y-auto">
                 {/* 内置主题 */}
-                {themes.map((theme) => (
+                {builtInThemesList.map((theme) => (
                   <button
                     key={theme.id}
                     onClick={() => {
@@ -207,10 +217,31 @@ export default function Toolbar({
                   </button>
                 ))}
                 
-                {/* 分割线 - 如果有多个主题，显示分割线 */}
-                {themes.length > 4 && (
+                {/* 分隔线 - 如果有自定义主题，显示分隔线 */}
+                {builtInThemesList.length > 0 && customThemes.length > 0 && (
                   <div className="border-t border-gray-200 my-1"></div>
                 )}
+                
+                {/* 自定义主题 */}
+                {customThemes.map((theme) => (
+                  <button
+                    key={theme.id}
+                    onClick={() => {
+                      setTheme(theme.id);
+                      setIsThemeMenuOpen(false);
+                    }}
+                    className={`w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center justify-between ${
+                      currentTheme.id === theme.id ? 'bg-blue-50 text-blue-600' : ''
+                    }`}
+                  >
+                    <span>{theme.name}</span>
+                    {currentTheme.id === theme.id && (
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                  </button>
+                ))}
                 
                 {/* 分割线 */}
                 <div className="border-t border-gray-200 my-1"></div>

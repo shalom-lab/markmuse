@@ -13,6 +13,7 @@ import { Dialog } from './Dialog';
 import { showToast } from '../utils/toast';
 import EmojiPicker from './EmojiPicker';
 import { createTheme, updateTheme, deleteTheme, validateThemeId } from '../storage/themeStorage';
+import { Save } from 'lucide-react';
 // 导入 highlight.js 的样式
 import 'highlight.js/styles/github-dark.css';
 // 导入 KaTeX 的样式
@@ -26,6 +27,8 @@ interface Props {
   isPreviewCollapsed: boolean;
   isCssCollapsed: boolean;
   onFormatAction?: (shortcut: string) => void;
+  autoSave?: boolean;
+  onSave?: () => void;
 }
 
 export default function MarkdownEditor({ 
@@ -35,7 +38,9 @@ export default function MarkdownEditor({
   isMarkdownCollapsed,
   isPreviewCollapsed,
   isCssCollapsed,
-  onFormatAction: _onFormatAction
+  onFormatAction: _onFormatAction,
+  autoSave = true,
+  onSave
 }: Props) {
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
@@ -755,38 +760,50 @@ export default function MarkdownEditor({
             <span className="px-2 py-1 text-gray-700">
               Markdown
             </span>
-            <button
-              onClick={(e) => {
-                if (!editorRef.current) return;
-                const textarea = editorRef.current;
-                const { start } = getCaretPosition(textarea);
-                // 获取按钮的位置
-                const buttonRect = e.currentTarget.getBoundingClientRect();
-                const pickerWidth = 320; // emoji 选择器宽度
-                const padding = 10; // 距离屏幕边缘的最小距离
-                
-                // 计算位置，优先右对齐，如果空间不足则左对齐
-                let left = buttonRect.right - pickerWidth;
-                if (left < padding) {
-                  left = buttonRect.left;
-                }
-                // 确保不超出右边界
-                if (left + pickerWidth > window.innerWidth - padding) {
-                  left = window.innerWidth - pickerWidth - padding;
-                }
-                
-                setEmojiInsertIndex(start);
-                setEmojiPosition({
-                  top: buttonRect.bottom + 5,
-                  left: left
-                });
-                setShowEmojiPicker(true);
-              }}
-              className="hover:bg-gray-100 p-1.5 rounded text-lg transition-colors flex items-center justify-center"
-              title="插入 Emoji"
-            >
-              😊
-            </button>
+            <div className="flex items-center gap-2">
+              {/* 手动保存按钮 - 仅在自动保存关闭时显示 */}
+              {!autoSave && currentFilePath && onSave && (
+                <button
+                  onClick={onSave}
+                  className="p-1.5 text-blue-600 hover:bg-gray-100 rounded transition-colors"
+                  title="保存文件 (Ctrl+S)"
+                >
+                  <Save className="w-4 h-4" />
+                </button>
+              )}
+              <button
+                onClick={(e) => {
+                  if (!editorRef.current) return;
+                  const textarea = editorRef.current;
+                  const { start } = getCaretPosition(textarea);
+                  // 获取按钮的位置
+                  const buttonRect = e.currentTarget.getBoundingClientRect();
+                  const pickerWidth = 320; // emoji 选择器宽度
+                  const padding = 10; // 距离屏幕边缘的最小距离
+                  
+                  // 计算位置，优先右对齐，如果空间不足则左对齐
+                  let left = buttonRect.right - pickerWidth;
+                  if (left < padding) {
+                    left = buttonRect.left;
+                  }
+                  // 确保不超出右边界
+                  if (left + pickerWidth > window.innerWidth - padding) {
+                    left = window.innerWidth - pickerWidth - padding;
+                  }
+                  
+                  setEmojiInsertIndex(start);
+                  setEmojiPosition({
+                    top: buttonRect.bottom + 5,
+                    left: left
+                  });
+                  setShowEmojiPicker(true);
+                }}
+                className="hover:bg-gray-100 p-1.5 rounded text-lg transition-colors flex items-center justify-center"
+                title="插入 Emoji"
+              >
+                😊
+              </button>
+            </div>
           </div>
           <textarea
             ref={editorRef}
@@ -856,23 +873,14 @@ export default function MarkdownEditor({
               <button
                 onClick={() => setShowSaveModal(true)}
                 disabled={!hasCssChanged}
-                className={`p-1.5 rounded transition-colors ${
+                className={`p-1.5 rounded transition-colors mr-3 ${
                   hasCssChanged
                     ? 'text-blue-600 hover:bg-gray-100 cursor-pointer'
                     : 'text-gray-400 cursor-not-allowed'
                 }`}
                 title={hasCssChanged ? '保存样式' : '样式未修改'}
               >
-                <svg
-                  className="w-4 h-4"
-                  viewBox="0 0 1024 1024"
-                  version="1.1"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="currentColor"
-                >
-                  <path d="M300.2 685.2h423.6v234.9H300.2z" fill="currentColor" />
-                  <path d="M944.4 302.8l-284.6-237H79.6v892.4h144.3V608.9H800v349.3h144.3V302.8z m-682.3-77.2h352.8v76.3H262.1v-76.3z m499.8 276.6H262.1V426h499.8v76.2z" fill="currentColor" />
-                </svg>
+                <Save className="w-4 h-4" />
               </button>
               {/* 更多操作按钮 */}
               <div className="relative" ref={themeMenuRef}>

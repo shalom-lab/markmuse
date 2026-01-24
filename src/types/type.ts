@@ -86,4 +86,18 @@ export interface Command {
   action: () => { text: string; cursorOffset: number };
 }
 
+// ============================================================================
+// 路径常量定义
+// ============================================================================
+
+/**
+ * 文件存储目录常量
+ * 
+ * 物理路径结构：
+ * - 用户文件：files/foo/bar.md
+ * - 主题文件：.themes/default.css
+ */
+export const FILES_DIR = 'files';
+export const THEMES_DIR = '.themes';
+
 

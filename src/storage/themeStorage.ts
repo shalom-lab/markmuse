@@ -3,7 +3,6 @@ import { themes as builtInThemes } from '../themes';
 import type { StoredTheme } from '../types/type';
 
 const THEMES_DIR = '.themes';
-const INIT_FLAG_KEY = 'markmuse-themes-initialized';
 const META_STORAGE_KEY = 'markmuse-themes-meta';
 
 // 元数据接口（存储在 localStorage）
@@ -71,6 +70,7 @@ export async function listThemes(): Promise<StoredTheme[]> {
 
   const themes: StoredTheme[] = [];
   const meta = getThemeMeta();
+  const builtInThemeIds = new Set(builtInThemes.map(t => t.id));
 
   // 遍历 themes 目录下的所有 .css 文件
   for await (const [name, handle] of (themesDir as any).entries()) {
@@ -106,6 +106,21 @@ export async function listThemes(): Promise<StoredTheme[]> {
       console.error('读取主题文件失败:', name, e);
     }
   }
+
+  // 排序：系统主题在前，然后按创建时间排序（早的在前）
+  themes.sort((a, b) => {
+    const aIsBuiltIn = builtInThemeIds.has(a.id);
+    const bIsBuiltIn = builtInThemeIds.has(b.id);
+    
+    // 系统主题优先
+    if (aIsBuiltIn && !bIsBuiltIn) return -1;
+    if (!aIsBuiltIn && bIsBuiltIn) return 1;
+    
+    // 都是系统主题或都是用户主题，按创建时间排序
+    const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    return aTime - bTime; // 早的在前
+  });
 
   return themes;
 }
@@ -322,7 +337,6 @@ export async function ensureBuiltInThemes(): Promise<void> {
   }
 
   saveThemeMeta(meta);
-  localStorage.setItem(INIT_FLAG_KEY, 'true');
 }
 
 /**

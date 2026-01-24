@@ -22,7 +22,7 @@ export default defineConfig({
           // 将代码编辑器分离
           'editor-vendor': ['@uiw/react-codemirror', '@codemirror/lang-css', '@codemirror/theme-one-dark'],
           // 将数据库相关分离
-          'db-vendor': ['dexie', 'dexie-react-hooks'],
+          // 'db-vendor': ['dexie', 'dexie-react-hooks'], // 已移除 Dexie
         }
       }
     },

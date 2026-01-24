@@ -30,6 +30,39 @@ export default function EditorPage() {
     loadAutoSaveSetting();
   }, [isSettingsVisible]); // 当设置页面打开/关闭时重新加载
 
+  // 手动保存文件
+  const handleManualSave = async () => {
+    if (!currentFilePath) {
+      showToast('没有打开的文件', { type: 'warning' });
+      return;
+    }
+    
+    try {
+      await saveFileContent(currentFilePath, content);
+      showToast('文件保存成功', { type: 'success' });
+    } catch (error) {
+      console.error('保存文件失败:', error);
+      showToast('保存文件失败，请重试', { type: 'error' });
+    }
+  };
+
+  // 添加 Ctrl+S 快捷键支持（仅在自动保存关闭时）
+  useEffect(() => {
+    if (autoSave) return; // 自动保存开启时不需要快捷键
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        handleManualSave();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [autoSave, currentFilePath, content]);
+
   const handleContentChange = async (newContent: string) => {
     setContent(newContent);
     
@@ -96,11 +129,12 @@ export default function EditorPage() {
     try {
       const { createFile, getFileContent } = await import('../storage/fileTreeService');
       
-      // 查找是否已存在"帮助文档.md"
+      // 查找是否已存在"帮助文档.md"（使用逻辑路径）
       let filePath = '帮助文档.md';
-      let existingContent: string | null = null;
+      let isExisting = false;
       try {
-        existingContent = await getFileContent(filePath);
+        await getFileContent(filePath);
+        isExisting = true;
       } catch {
         // 文件不存在，继续创建
       }
@@ -114,7 +148,7 @@ export default function EditorPage() {
 ### 1. 文件管理
 - 在左侧文件树中创建、重命名、删除文件和文件夹
 - 支持文件夹嵌套结构
-- 所有文件自动保存到本地 IndexedDB
+- 所有文件自动保存到本地 OPFS（Origin Private File System）
 
 ### 2. Markdown 编辑
 - 实时预览 Markdown 内容
@@ -312,22 +346,24 @@ A: 在文件树中悬停文件，点击删除按钮（🗑️）。
 A: 在样式编辑器中修改 CSS，点击保存按钮，选择"更新主题"或"另存为新主题"。
 
 ### Q: 数据存储在哪里？
-A: 所有数据存储在浏览器的 IndexedDB 中，无需担心数据丢失。
+A: 所有数据存储在浏览器的 OPFS（Origin Private File System）中，无需担心数据丢失。
 
 ---
 
 如有问题或建议，欢迎反馈！
 `;
 
-      if (existingContent !== null) {
+      if (isExisting) {
         // 如果文件已存在，更新内容
         await saveFileContent(filePath, helpContent);
         handleSelectFile(filePath);
+        showToast('帮助文档已打开', { type: 'success' });
       } else {
         // 如果文件不存在，创建新文件
-        filePath = await createFile(null, '帮助文档');
+        filePath = await createFile('帮助文档');
         await saveFileContent(filePath, helpContent);
         handleSelectFile(filePath);
+        showToast('帮助文档创建成功', { type: 'success' });
       }
       
       // 确保显示编辑页面（关闭设置、主题管理等）
@@ -342,13 +378,19 @@ A: 所有数据存储在浏览器的 IndexedDB 中，无需担心数据丢失。
     }
   };
 
-  // 定期同步和页面失活同步
+  // 定期自动增量推送（仅在页面激活时）
   useEffect(() => {
     let syncInterval: ReturnType<typeof setInterval> | null = null;
 
     const performSync = async () => {
-      const settings = await getSettings();
-      if (!settings.enableSync || !settings.githubRepo || !settings.githubToken) {
+      // 只在页面可见时执行
+      if (document.hidden) {
+        return;
+      }
+
+      const { getGitHubConfig } = await import('../services/settingsStorage');
+      const config = getGitHubConfig();
+      if (!config) {
         return;
       }
 
@@ -360,70 +402,68 @@ A: 所有数据存储在浏览器的 IndexedDB 中，无需担心数据丢失。
       try {
         isSyncingRef.current = true;
         const { syncAllMarkdownFiles } = await import('../sync/syncEngine');
-        const { loadGitHubConfig } = await import('../services/githubConfig');
-        const config = loadGitHubConfig();
-        if (config) {
-          await syncAllMarkdownFiles(config);
-          console.log('自动同步完成');
-        }
+        await syncAllMarkdownFiles(config);
+        console.log('定期自动增量推送完成');
       } catch (error) {
-        console.error('自动同步失败:', error);
+        console.error('定期自动增量推送失败:', error);
       } finally {
         isSyncingRef.current = false;
       }
     };
 
-    // 设置定期同步
-    const setupPeriodicSync = async () => {
-      const settings = await getSettings();
+    // 清除定时器
+    const clearSyncInterval = () => {
       if (syncInterval) {
         clearInterval(syncInterval);
         syncInterval = null;
       }
-
-      if (settings.enableSync && settings.autoSyncInterval && settings.autoSyncInterval > 0) {
-        syncInterval = setInterval(performSync, settings.autoSyncInterval * 60 * 1000);
-        console.log(`定期同步已设置：每 ${settings.autoSyncInterval} 分钟同步一次`);
-      }
     };
 
-    // 页面失活时同步
-    const handleVisibilityChange = async () => {
-      if (document.visibilityState === 'hidden') {
-        const settings = await getSettings();
-        if (settings.enableSync && settings.syncOnDeactivate) {
-          await performSync();
-        }
+    // 设置定期同步（仅在页面可见时）
+    const setupPeriodicSync = async () => {
+      // 如果页面隐藏，不设置定时器
+      if (document.hidden) {
+        clearSyncInterval();
+        return;
       }
-    };
 
-    // 关闭浏览器前同步（注意：beforeunload 中只能使用同步操作，异步可能无法完成）
-    const handleBeforeUnload = async () => {
       const settings = await getSettings();
-      if (settings.enableSync && settings.syncOnDeactivate) {
-        // 使用 sendBeacon 或 navigator.sendBeacon 进行最后的同步尝试
-        // 但 GitHub API 调用可能无法在 beforeunload 中完成
-        // 所以主要依赖 visibilitychange 事件
-        console.log('页面即将关闭，尝试同步...');
+      if (!settings.autoSyncInterval || settings.autoSyncInterval <= 0) {
+        clearSyncInterval();
+        return;
+      }
+
+      // 清除旧的定时器
+      clearSyncInterval();
+
+      // 设置新的定时器，从页面激活时开始计时
+      syncInterval = setInterval(performSync, settings.autoSyncInterval * 60 * 1000);
+      console.log(`定期自动增量推送已设置：每 ${settings.autoSyncInterval} 分钟同步一次（从页面激活时开始计时）`);
+    };
+
+    // 处理页面可见性变化
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible') {
+        // 页面激活时，重新设置定时器（从激活时开始计时）
+        await setupPeriodicSync();
+      } else {
+        // 页面隐藏时，清除定时器
+        clearSyncInterval();
       }
     };
 
-    // 初始化
+    // 初始化：如果页面可见，设置定时器
     setupPeriodicSync();
 
-    // 监听事件
+    // 监听页面可见性变化
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('beforeunload', handleBeforeUnload);
 
     // 清理
     return () => {
-      if (syncInterval) {
-        clearInterval(syncInterval);
-      }
+      clearSyncInterval();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, []); // 只在组件挂载时设置一次
+  }, [isSettingsVisible]); // 当设置页面打开/关闭时重新加载
 
   return (
     <div className="h-screen flex flex-col">
@@ -509,6 +549,8 @@ A: 所有数据存储在浏览器的 IndexedDB 中，无需担心数据丢失。
               onChange={handleContentChange}
               currentFilePath={currentFilePath}
               isMarkdownCollapsed={!isMarkdownVisible}
+              autoSave={autoSave}
+              onSave={handleManualSave}
               isPreviewCollapsed={!isPreviewVisible}
               isCssCollapsed={!isCssVisible}
             />

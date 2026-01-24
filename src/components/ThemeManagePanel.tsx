@@ -109,33 +109,76 @@ export default function ThemeManagePanel({ onClose }: Props) {
               <p>暂无主题</p>
               <p className="text-sm mt-2">您可以在样式编辑器中创建自定义主题</p>
             </div>
-          ) : (
-            <div className="space-y-3">
-              {themes.map((theme) => (
-                <div
-                  key={theme.id}
-                  className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-gray-900">{theme.name}</span>
-                      {(currentTheme.id === theme.id || currentTheme.name === theme.name) && (
-                        <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-600 rounded">
-                          当前使用
+          ) : (() => {
+            const builtInThemes = themes.filter(t => BUILT_IN_THEME_IDS.has(t.id));
+            const customThemes = themes.filter(t => !BUILT_IN_THEME_IDS.has(t.id));
+            
+            return (
+              <div className="space-y-3">
+                {/* 内置主题 */}
+                {builtInThemes.map((theme) => (
+                  <div
+                    key={theme.id}
+                    className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-gray-900">{theme.name}</span>
+                        <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded">
+                          系统
                         </span>
-                      )}
-                    </div>
-                    <div className="mt-1 text-xs text-gray-500">
-                      创建于: {theme.createdAt ? new Date(theme.createdAt).toLocaleString('zh-CN') : '-'}
-                      {theme.updatedAt && theme.updatedAt !== theme.createdAt && (
-                        <span className="ml-3">
-                          更新于: {new Date(theme.updatedAt).toLocaleString('zh-CN')}
-                        </span>
-                      )}
+                        {(currentTheme.id === theme.id || currentTheme.name === theme.name) && (
+                          <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-600 rounded">
+                            当前使用
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-1 text-xs text-gray-500">
+                        创建于: {theme.createdAt ? new Date(theme.createdAt).toLocaleString('zh-CN') : '-'}
+                        {theme.updatedAt && theme.updatedAt !== theme.createdAt && (
+                          <span className="ml-3">
+                            更新于: {new Date(theme.updatedAt).toLocaleString('zh-CN')}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                  {/* 内置主题不显示删除按钮，其它主题可以删除 */}
-                  {!BUILT_IN_THEME_IDS.has(theme.id) && (
+                ))}
+                
+                {/* 分隔线 - 如果有自定义主题，显示分隔线 */}
+                {builtInThemes.length > 0 && customThemes.length > 0 && (
+                  <div className="border-t border-gray-300 my-4">
+                    <div className="text-xs text-gray-500 px-2 py-1 bg-gray-50 -mt-2.5 inline-block">
+                      自定义主题
+                    </div>
+                  </div>
+                )}
+                
+                {/* 自定义主题 */}
+                {customThemes.map((theme) => (
+                  <div
+                    key={theme.id}
+                    className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-gray-900">{theme.name}</span>
+                        {(currentTheme.id === theme.id || currentTheme.name === theme.name) && (
+                          <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-600 rounded">
+                            当前使用
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-1 text-xs text-gray-500">
+                        创建于: {theme.createdAt ? new Date(theme.createdAt).toLocaleString('zh-CN') : '-'}
+                        {theme.updatedAt && theme.updatedAt !== theme.createdAt && (
+                          <span className="ml-3">
+                            更新于: {new Date(theme.updatedAt).toLocaleString('zh-CN')}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {/* 自定义主题可以删除 */}
                     <button
                       onClick={() => handleDelete(theme)}
                       disabled={deletingId === theme.id}
@@ -143,11 +186,11 @@ export default function ThemeManagePanel({ onClose }: Props) {
                     >
                       {deletingId === theme.id ? '删除中...' : '删除'}
                     </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
 
           {/* 关闭按钮（右下角对齐，与设置页面风格一致） */}
           <div className="pt-4 flex justify-end">
