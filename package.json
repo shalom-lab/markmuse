@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:lib": "cd lib && npm run build",
+    "publish:lib": "cd lib && npm publish",
+    "test:lib": "cd lib && npm run test"
   },
   "dependencies": {
     "@codemirror/lang-css": "^6.3.1",

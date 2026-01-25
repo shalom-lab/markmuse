@@ -950,6 +950,7 @@ export default function MarkdownEditor({
       <Sidebar
         getPreviewElement={() => previewRef.current}
         customCss={customCss}
+        getMarkdownContent={() => editorRef.current?.value || content}
       />
 
       {/* 保存样式Modal */}

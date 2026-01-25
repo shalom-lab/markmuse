@@ -9,3 +9,7 @@ dist
 .env.development.local  # 环境变量
 .env.test.local  # 环境变量
 .env.production.local  # 环境变量
+
+lib/node_modules
+lib/dist
+lib/.markmuse

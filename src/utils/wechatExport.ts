@@ -138,20 +138,13 @@ async function convertLatexToSVGAsync(latex: string, isDisplay: boolean): Promis
       return '';
     }
     
-    // 确保 SVG 有正确的样式属性
-    const currentStyle = svgEl.getAttribute('style') || '';
-    let newStyle = currentStyle.replace(/;;+/g, ';').replace(/^;|;$/g, '');
-    
-    if (!newStyle.includes('max-width')) {
-      newStyle = newStyle ? `${newStyle}; max-width: 300% !important;` : 'max-width: 300% !important;';
-    }
-    
+    // 移除 color 属性（如果存在），其他样式由 CSS 决定
     svgEl.removeAttribute('color');
-    svgEl.setAttribute('style', newStyle);
     
     const finalSVG = svgEl.outerHTML;
     const escapedLatex = latex.replace(/"/g, '&quot;');
     
+    // 块级公式需要居中显示，这是功能性样式，写死
     if (isDisplay) {
       return `<section class="block-equation" data-formula="${escapedLatex}" style="text-align: center; overflow-x: auto; overflow-y: auto; display: block;">${finalSVG}</section>`;
     } else {
@@ -335,17 +328,8 @@ export async function solveWeChatMath(element: HTMLElement): Promise<void> {
     }
   });
   
-  // 处理已经存在的 block-equation 格式
-  const blockEquations = element.querySelectorAll('.block-equation, section.block-equation');
-  blockEquations.forEach((blockEl) => {
-    const svgElements = blockEl.querySelectorAll('svg');
-    svgElements.forEach((svg) => {
-      const currentStyle = svg.getAttribute('style') || '';
-      if (!currentStyle.includes('max-width')) {
-        svg.setAttribute('style', `${currentStyle}; max-width: 300% !important;`.replace(/^; /, ''));
-      }
-    });
-  });
+  // 处理已经存在的 block-equation 格式（不添加任何样式，完全由传入的 CSS 决定）
+  // 这里只做结构处理，不修改样式
 }
 
 // 从预览区域获取HTML内容（参考mdnice的实现）
@@ -378,41 +362,7 @@ export async function convertToWeChatHTML(previewElement: HTMLElement | null, cs
   
   // 不再添加 data-tool 属性（用户不需要）
   
-  // 为代码块添加 macOS 风格的三个彩色圆点（微信公众号不支持伪元素）
-  const preElements = tempDiv.querySelectorAll('pre');
-  preElements.forEach((pre) => {
-    const preEl = pre as HTMLElement;
-    // 检查是否已经有圆点元素
-    if (!preEl.querySelector('.mac-dots')) {
-      // 创建圆点容器
-      const dotsContainer = document.createElement('div');
-      dotsContainer.className = 'mac-dots';
-      dotsContainer.setAttribute('style', 'position: absolute; top: 12px; left: 12px; display: flex; gap: 8px; z-index: 1;');
-      
-      // 创建三个彩色圆点
-      const dot1 = document.createElement('span');
-      dot1.setAttribute('style', 'width: 12px; height: 12px; border-radius: 50%; background-color: #ff5f56; display: inline-block;');
-      
-      const dot2 = document.createElement('span');
-      dot2.setAttribute('style', 'width: 12px; height: 12px; border-radius: 50%; background-color: #ffbd2e; display: inline-block;');
-      
-      const dot3 = document.createElement('span');
-      dot3.setAttribute('style', 'width: 12px; height: 12px; border-radius: 50%; background-color: #27c93f; display: inline-block;');
-      
-      dotsContainer.appendChild(dot1);
-      dotsContainer.appendChild(dot2);
-      dotsContainer.appendChild(dot3);
-      
-      // 确保 pre 元素有 position: relative
-      const currentStyle = preEl.getAttribute('style') || '';
-      if (!currentStyle.includes('position')) {
-        preEl.setAttribute('style', `position: relative; ${currentStyle}`);
-      }
-      
-      // 将圆点插入到 pre 元素的开头
-      preEl.insertBefore(dotsContainer, preEl.firstChild);
-    }
-  });
+  // 代码块样式由主题 CSS 统一管理（通过 pre::before 伪元素实现三个圆点），不再通过 DOM 操作添加
   
   // 处理数学公式（在移除脚本之前处理）
   await solveWeChatMath(tempDiv);
@@ -437,16 +387,11 @@ export async function convertToWeChatHTML(previewElement: HTMLElement | null, cs
     return '';
   }
   
-  // 确保代码块中的空格被保留（在 juice 处理前）
-  // 将代码块中的普通空格转换为 &nbsp; 以确保微信中正确显示
+  // 代码块样式完全由传入的 CSS 决定，不添加硬编码样式
+  // 将代码块中的普通空格转换为 &nbsp;（这是内容处理，不是样式）
   const codeElements = wrapperDiv.querySelectorAll('pre code, code.hljs');
   codeElements.forEach((codeEl) => {
     const htmlEl = codeEl as HTMLElement;
-    // 确保 white-space 样式被设置
-    if (!htmlEl.getAttribute('style') || !htmlEl.getAttribute('style')?.includes('white-space')) {
-      const currentStyle = htmlEl.getAttribute('style') || '';
-      htmlEl.setAttribute('style', `${currentStyle}; white-space: pre-wrap; word-wrap: break-word;`.replace(/^; /, ''));
-    }
     
     // 遍历所有文本节点，将普通空格转换为 &nbsp;
     // 这样可以确保在微信中空格被正确保留
@@ -463,11 +408,7 @@ export async function convertToWeChatHTML(previewElement: HTMLElement | null, cs
     }
     
     textNodes.forEach(textNode => {
-      // 将普通空格（U+0020）转换为 &nbsp;，但保留换行符和制表符
-      // 注意：只替换单个空格，连续的多个空格保留第一个为普通空格以支持换行
       let text = textNode.textContent || '';
-      // 将单个空格转换为 &nbsp;，但不在行首和行尾
-      // 更简单的方法：将所有空格都转换为 &nbsp;
       text = text.replace(/ /g, '\u00A0'); // \u00A0 是 &nbsp; 的 Unicode 码点
       if (text !== textNode.textContent) {
         textNode.textContent = text;
@@ -475,44 +416,13 @@ export async function convertToWeChatHTML(previewElement: HTMLElement | null, cs
     });
   });
   
-  // 确保 pre 元素也有 white-space 样式
-  const preElementsForSpace = wrapperDiv.querySelectorAll('pre');
-  preElementsForSpace.forEach((preEl) => {
-    const htmlEl = preEl as HTMLElement;
-    const currentStyle = htmlEl.getAttribute('style') || '';
-    if (!currentStyle.includes('white-space')) {
-      htmlEl.setAttribute('style', `${currentStyle}; white-space: pre-wrap; word-wrap: break-word;`.replace(/^; /, ''));
-    }
-  });
-  
   await solveWeChatMath(wrapperDiv);
   
   // 获取 highlight.js 的样式并合并到 CSS 中
   const highlightStyles = getHighlightStyles();
-  const fullCss = cssText + '\n' + highlightStyles + '\n' + `
-pre, pre code, code.hljs, .hljs {
-  white-space: pre-wrap !important;
-  word-wrap: break-word !important;
-}
-.katex {
-  font-size: 1.1em !important;
-}
-.katex-display {
-  display: block !important;
-  margin: 1em 0 !important;
-  text-align: center !important;
-}
-.katex-display > .katex {
-  display: inline-block !important;
-  text-align: initial !important;
-}
-.katex svg {
-  display: inline-block !important;
-  vertical-align: middle !important;
-  max-width: 100% !important;
-  height: auto !important;
-}
-  `.trim();
+  // 所有样式都在主题 CSS 中统一管理，不添加硬编码的默认样式
+  // 只添加 highlight.js 样式（因为需要从 document.styleSheets 获取）
+  const fullCss = cssText + '\n' + highlightStyles;
   
   // 使用 juice 内联 CSS 样式（在包装 div 上）
   let html = wrapperDiv.outerHTML;
@@ -633,17 +543,7 @@ pre, pre code, code.hljs, .hljs {
   
   await solveWeChatMath(tempContainer);
   
-  // 确保代码块中的空格样式被保留
-  const finalCodeElements = tempContainer.querySelectorAll('pre, code');
-  finalCodeElements.forEach((codeEl) => {
-    const htmlEl = codeEl as HTMLElement;
-    const currentStyle = htmlEl.getAttribute('style') || '';
-    if (!currentStyle.includes('white-space')) {
-      htmlEl.setAttribute('style', `${currentStyle}; white-space: pre-wrap; word-wrap: break-word;`.replace(/^; /, ''));
-    } else if (!currentStyle.includes('pre-wrap')) {
-      htmlEl.setAttribute('style', currentStyle.replace(/white-space:\s*[^;]+/gi, 'white-space: pre-wrap') + '; word-wrap: break-word;');
-    }
-  });
+  // 代码块样式完全由传入的 CSS 决定，不添加硬编码样式
   
   // 移除所有 data-tool 和 data-website 属性
   const allElementsWithDataTool = tempContainer.querySelectorAll('[data-tool]');
@@ -665,7 +565,7 @@ pre, pre code, code.hljs, .hljs {
 }
 
 // 复制HTML到剪贴板（参考mdnice的copySafari方法）
-export function copySafari(html: string): Promise<boolean> {
+export function copySafari(html: string, plainText?: string, markdown?: string): Promise<boolean> {
   return new Promise((resolve) => {
     let resolved = false;
     
@@ -690,7 +590,12 @@ export function copySafari(html: string): Promise<boolean> {
       e.preventDefault();
       if (e.clipboardData) {
         e.clipboardData.setData('text/html', html);
-        e.clipboardData.setData('text/plain', html);
+        // 如果提供了纯文本，使用纯文本；否则使用 HTML 作为兜底
+        e.clipboardData.setData('text/plain', plainText || html);
+        // 如果提供了 Markdown，添加 Markdown 格式
+        if (markdown) {
+          e.clipboardData.setData('text/markdown', markdown);
+        }
       }
       document.removeEventListener('copy', copyHandler);
       if (!resolved) {
@@ -745,10 +650,10 @@ export function copySafari(html: string): Promise<boolean> {
 }
 
 // 复制到剪贴板（兼容方法）
-export async function copyToClipboard(html: string): Promise<boolean> {
-  // 优先使用 copySafari 方法（支持富文本）
+export async function copyToClipboard(html: string, plainText?: string, markdown?: string): Promise<boolean> {
+  // 优先使用 copySafari 方法（支持富文本和多格式）
   try {
-    return await copySafari(html);
+    return await copySafari(html, plainText, markdown);
   } catch (err) {
     console.error('复制失败:', err);
     return false;

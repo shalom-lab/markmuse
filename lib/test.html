@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MarkMuse WeChat Headless 测试</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 1200px;
+      margin: 20px auto;
+      padding: 20px;
+    }
+    .input-area {
+      margin-bottom: 20px;
+    }
+    textarea {
+      width: 100%;
+      min-height: 200px;
+      padding: 10px;
+      border: 1px solid #ddd;
+      font-family: monospace;
+    }
+    button {
+      padding: 10px 20px;
+      background: #667eea;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-right: 10px;
+    }
+    button:hover {
+      background: #5568d3;
+    }
+    .output {
+      margin-top: 20px;
+      padding: 15px;
+      border: 1px solid #ddd;
+      background: #f9f9f9;
+      min-height: 200px;
+      max-height: 400px;
+      overflow: auto;
+      word-break: break-all;
+    }
+    .output pre {
+      margin: 0;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .preview {
+      margin-top: 20px;
+      padding: 15px;
+      border: 1px solid #ddd;
+      background: white;
+    }
+  </style>
+</head>
+<body>
+  <h1>MarkMuse WeChat Headless 测试</h1>
+  
+  <div class="input-area">
+    <h3>Markdown 输入：</h3>
+    <textarea id="markdown"># 测试标题
+
+这是内容 $E = mc^2$
+
+\`\`\`javascript
+console.log('hello');
+\`\`\`</textarea>
+    
+    <h3>CSS 输入（可选）：</h3>
+    <textarea id="css"></textarea>
+    
+    <div style="margin-top: 10px;">
+      <button onclick="convertWithDefault()">转换（默认样式）</button>
+      <button onclick="convertWithCustom()">转换（自定义CSS）</button>
+      <button onclick="copyToWeChat()" id="copyBtn" style="display:none; background: #28a745;">复制到微信</button>
+    </div>
+  </div>
+
+  <div class="output">
+    <h3>HTML 输出：</h3>
+    <pre id="htmlOutput"></pre>
+  </div>
+
+  <div class="preview">
+    <h3>预览效果：</h3>
+    <div id="previewOutput"></div>
+  </div>
+
+  <!-- 加载 MathJax -->
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+  
+  <div style="background: #d1ecf1; padding: 15px; margin: 20px 0; border: 1px solid #bee5eb; border-radius: 4px;">
+    <strong>💡 使用说明：</strong>
+    <p>请使用以下命令启动测试服务器：</p>
+    <code style="background: #f8f9fa; padding: 5px 10px; border-radius: 3px; display: block; margin: 10px 0;">
+      npm run test:lib
+    </code>
+    <p style="margin-top: 10px; font-size: 14px; color: #666;">
+      或者：<code>cd lib && npm run test</code>
+    </p>
+  </div>
+  
+  <!-- 加载构建后的库文件 -->
+  <script type="module">
+    // 等待 MathJax 加载
+    function waitForMathJax() {
+      return new Promise((resolve) => {
+        if (window.MathJax && typeof window.MathJax.tex2svg === 'function') {
+          resolve();
+          return;
+        }
+        const check = setInterval(() => {
+          if (window.MathJax && typeof window.MathJax.tex2svg === 'function') {
+            clearInterval(check);
+            resolve();
+          }
+        }, 100);
+        setTimeout(() => {
+          clearInterval(check);
+          resolve();
+        }, 5000);
+      });
+    }
+
+    let convert, convertDefault;
+    let lastHtml = '';
+
+    // 加载库
+    async function loadLibrary() {
+      try {
+        await waitForMathJax();
+        // 从 dist 目录加载构建后的文件
+        const module = await import('./dist/index.js');
+        convert = module.convert;
+        convertDefault = module.convertDefault;
+        console.log('库加载成功');
+      } catch (error) {
+        alert('加载库失败，请先运行 npm run build:lib 构建库文件\n\n错误: ' + error.message);
+        console.error(error);
+      }
+    }
+
+    // 转换函数
+    window.convertWithDefault = async function() {
+      if (!convertDefault) {
+        alert('库未加载，请先构建: npm run build:lib');
+        return;
+      }
+      const markdown = document.getElementById('markdown').value;
+      try {
+        const html = await convertDefault(markdown);
+        lastHtml = html;
+        document.getElementById('htmlOutput').textContent = html;
+        document.getElementById('previewOutput').innerHTML = html;
+        document.getElementById('copyBtn').style.display = 'inline-block';
+      } catch (error) {
+        alert('转换失败: ' + error.message);
+        console.error(error);
+      }
+    };
+
+    window.convertWithCustom = async function() {
+      if (!convert) {
+        alert('库未加载，请先构建: npm run build:lib');
+        return;
+      }
+      const markdown = document.getElementById('markdown').value;
+      const css = document.getElementById('css').value;
+      if (!css) {
+        alert('请输入 CSS');
+        return;
+      }
+      try {
+        const html = await convert(markdown, css);
+        lastHtml = html;
+        document.getElementById('htmlOutput').textContent = html;
+        document.getElementById('previewOutput').innerHTML = html;
+        document.getElementById('copyBtn').style.display = 'inline-block';
+      } catch (error) {
+        alert('转换失败: ' + error.message);
+        console.error(error);
+      }
+    };
+
+    window.copyToWeChat = async function() {
+      if (!lastHtml) {
+        alert('请先转换内容');
+        return;
+      }
+      try {
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = lastHtml;
+        const plainText = tempDiv.innerText || tempDiv.textContent || '';
+        
+        if (navigator.clipboard && navigator.clipboard.write) {
+          const clipboardItem = new ClipboardItem({
+            'text/html': new Blob([lastHtml], { type: 'text/html' }),
+            'text/plain': new Blob([plainText], { type: 'text/plain' })
+          });
+          await navigator.clipboard.write([clipboardItem]);
+        } else {
+          const range = document.createRange();
+          range.selectNodeContents(tempDiv);
+          const selection = window.getSelection();
+          selection.removeAllRanges();
+          selection.addRange(range);
+          document.execCommand('copy');
+          selection.removeAllRanges();
+        }
+        document.body.removeChild(tempDiv);
+        alert('已复制到剪贴板！');
+      } catch (error) {
+        alert('复制失败: ' + error.message);
+        console.error(error);
+      }
+    };
+
+    // 初始化
+    loadLibrary();
+  </script>
+</body>
+</html>

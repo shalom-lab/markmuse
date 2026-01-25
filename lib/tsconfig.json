@@ -1,0 +1,26 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "../",
+    "declaration": true,
+    "declarationMap": true,
+    "emitDeclarationOnly": true,
+    "noEmit": false,
+    "composite": true,
+    "paths": {
+      "@/*": ["../src/*"]
+    }
+  },
+  "include": [
+    "index.ts",
+    "../src/utils/wechatExportHeadless.ts",
+    "../src/utils/wechatExport.ts",
+    "../src/utils/markdown-it-math.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+}
+

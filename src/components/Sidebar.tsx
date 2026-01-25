@@ -2,16 +2,19 @@ import { useState } from 'react';
 import Logo from './Logo';
 import { WeChatOfficialAccountIcon } from './icons';
 import { convertToWeChatHTML, copyToClipboard } from '../utils/wechatExport';
+import { convertToWeChatHTMLHeadless } from '../utils/wechatExportHeadless';
 import { Toast } from './Toast';
 
 interface Props {
   getPreviewElement: () => HTMLElement | null;
   customCss: string;
+  getMarkdownContent: () => string;
 }
 
 export default function Sidebar({ 
   getPreviewElement,
-  customCss
+  customCss,
+  getMarkdownContent
 }: Props) {
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
@@ -41,10 +44,63 @@ export default function Sidebar({
         return;
       }
       
-      const success = await copyToClipboard(wechatHTML);
+      // 从 HTML 中提取纯文本（用于 text/plain 格式）
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = wechatHTML;
+      const plainText = tempDiv.innerText || tempDiv.textContent || '';
+      
+      // 获取原始 markdown（用于 text/markdown 格式）
+      const markdown = getMarkdownContent();
+      
+      const success = await copyToClipboard(wechatHTML, plainText, markdown);
       
       if (success) {
-        setToastMessage('已复制到剪贴板，可直接粘贴到微信公众号编辑器');
+        setToastMessage('已复制，可粘贴到公众号编辑器');
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+      } else {
+        setToastMessage('复制失败，请重试');
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+      }
+    } catch (error) {
+      console.error('转换失败:', error);
+      setToastMessage('转换失败，请重试');
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    }
+  };
+
+  const handleWeChatCopyHeadless = async () => {
+    try {
+      const markdown = getMarkdownContent();
+      
+      if (!markdown || markdown.trim() === '') {
+        setToastMessage('内容为空，请先编辑内容');
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+        return;
+      }
+      
+      const wechatHTML = await convertToWeChatHTMLHeadless(markdown, customCss);
+      
+      if (!wechatHTML || wechatHTML.trim() === '') {
+        setToastMessage('转换结果为空，请重试');
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+        return;
+      }
+      
+      // 从 HTML 中提取纯文本（用于 text/plain 格式）
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = wechatHTML;
+      const plainText = tempDiv.innerText || tempDiv.textContent || '';
+      
+      // 使用原始 markdown（用于 text/markdown 格式）
+      const success = await copyToClipboard(wechatHTML, plainText, markdown);
+      
+      if (success) {
+        setToastMessage('已复制，可粘贴到公众号编辑器');
         setShowToast(true);
         setTimeout(() => setShowToast(false), 3000);
       } else {
@@ -76,6 +132,11 @@ export default function Sidebar({
       icon: <WeChatOfficialAccountIcon className="w-5 h-5" />, 
       label: '公众号',
       onClick: handleWeChatCopy
+    },
+    { 
+      icon: <WeChatOfficialAccountIcon className="w-5 h-5" />, 
+      label: '公众号',
+      onClick: handleWeChatCopyHeadless
     },
     // { icon: '知', label: '知乎' },
     // { icon: '∧', label: '导出' },

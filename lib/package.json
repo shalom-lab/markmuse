@@ -1,0 +1,52 @@
+{
+    "name": "@yourname/markmuse-wechat-headless",
+    "version": "1.0.0",
+    "description": "Convert Markdown to WeChat Official Account HTML format (requires browser environment)",
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "import": "./dist/index.js",
+            "types": "./dist/index.d.ts"
+        }
+    },
+    "files": [
+        "dist",
+        "README.md"
+    ],
+    "keywords": [
+        "markdown",
+        "wechat",
+        "wechat-official-account",
+        "html",
+        "converter",
+        "headless"
+    ],
+    "author": "Your Name",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/yourname/markmuse"
+    },
+    "peerDependencies": {
+        "mathjax": "^3.0.0"
+    },
+    "dependencies": {
+        "juice": "^11.0.3",
+        "markdown-it": "^14.1.0",
+        "highlight.js": "^11.11.1",
+        "katex": "^0.16.27"
+    },
+    "devDependencies": {
+        "typescript": "^5.2.2",
+        "vite": "^5.1.0",
+        "@types/node": "^20.0.0"
+    },
+    "scripts": {
+        "build": "vite build",
+        "type-check": "tsc --noEmit",
+        "preview": "vite preview",
+        "test": "vite --config vite.dev.config.ts"
+    }
+}
