@@ -450,7 +450,7 @@ export async function convertToWeChatHTML(previewElement: HTMLElement | null, cs
   
   // 创建section元素作为最外层容器
   const section = document.createElement('section');
-  section.setAttribute('id', 'nice');
+  section.setAttribute('id', 'markmuse');
   
   // 将内联样式后的内容移动到 section 中（保留内联样式）
   while (innerContent.firstChild) {
@@ -536,7 +536,7 @@ export async function convertToWeChatHTML(previewElement: HTMLElement | null, cs
       }
     }
     const id = el.getAttribute('id');
-    if (id && id !== 'nice') {
+    if (id && id !== 'markmuse') {
       el.removeAttribute('id');
     }
   });
@@ -558,7 +558,7 @@ export async function convertToWeChatHTML(previewElement: HTMLElement | null, cs
   // 确保section有id
   const finalSection = tempContainer.querySelector('section');
   if (finalSection) {
-    finalSection.setAttribute('id', 'nice');
+    finalSection.setAttribute('id', 'markmuse');
   }
   
   return tempContainer.innerHTML;

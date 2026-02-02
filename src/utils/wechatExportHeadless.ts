@@ -380,7 +380,7 @@ export async function convertToWeChatHTMLHeadless(markdown: string, cssText: str
   }
   
   const section = document.createElement('section');
-  section.setAttribute('id', 'nice');
+  section.setAttribute('id', 'markmuse');
   // section 的样式完全由传入的 CSS 决定，不设置任何内联样式
   
   while (innerContent.firstChild) {
@@ -406,7 +406,7 @@ export async function convertToWeChatHTMLHeadless(markdown: string, cssText: str
       }
     }
     const id = el.getAttribute('id');
-    if (id && id !== 'nice') {
+    if (id && id !== 'markmuse') {
       el.removeAttribute('id');
     }
   });
@@ -431,7 +431,7 @@ export async function convertToWeChatHTMLHeadless(markdown: string, cssText: str
   // 确保 section 有 id
   const finalSection = tempContainer.querySelector('section');
   if (finalSection) {
-    finalSection.setAttribute('id', 'nice');
+    finalSection.setAttribute('id', 'markmuse');
   }
   
   return tempContainer.innerHTML;
