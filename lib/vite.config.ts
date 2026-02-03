@@ -7,14 +7,14 @@ const __dirname = fileURLToPath(new URL('.', import.meta.url));
 export default defineConfig({
   build: {
     lib: {
-      entry: resolve(__dirname, 'index.ts'),
+      entry: resolve(__dirname, 'src/index.ts'),
       name: 'MarkMuseWeChatHeadless',
       fileName: 'index',
       formats: ['es']
     },
     outDir: 'dist',
-    // 生成 source map（Vite 5 推荐方式）
-    sourcemap: true,
+    emptyOutDir: false,
+    sourcemap: false,
     rollupOptions: {
       // 外部化依赖，不打包进库中
       external: [
@@ -30,8 +30,7 @@ export default defineConfig({
         preserveModules: false
       }
     },
-    // 不压缩，让用户自己决定
-    minify: false
+    minify: true
   },
   resolve: {
     // 解析路径，指向 src 目录

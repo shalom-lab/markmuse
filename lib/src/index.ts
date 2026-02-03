@@ -3,44 +3,31 @@
  * 
  * 将 Markdown 转换为微信公众号格式的 HTML
  * 
- * ⚠️ 注意：此包需要在浏览器环境中使用（如 Playwright、Puppeteer）
+ * ⚠️ 注意：此包需要在浏览器环境中使用
+ * 
+ * 推荐使用方式：
+ * - Node.js 环境：使用 `markmuse-wechat/converter` 中的 `getWeChatHtml` 函数
+ * - 浏览器环境：直接导入并使用 `convert` 或 `convertDefault` 函数
  * 
  * @example
  * ```javascript
+ * // 在浏览器环境中使用
+ * import { convert, convertDefault } from 'markmuse-wechat';
+ * 
  * // 方式 1：完全控制样式
- * import { convert } from '@yourname/markmuse-wechat-headless';
  * const html = await convert(markdown, css);
  * 
  * // 方式 2：使用默认样式（推荐）
- * import { convertDefault } from '@yourname/markmuse-wechat-headless';
- * const html = await convertDefault(markdown);  // 使用默认样式
+ * const html = await convertDefault(markdown);
  * const html2 = await convertDefault(markdown, customCss);  // 自定义样式覆盖默认样式
- * ```
- * 
- * @example
- * ```javascript
- * // 在 Playwright 中使用
- * import { chromium } from 'playwright';
- * import { convertDefault } from '@yourname/markmuse-wechat-headless';
- * 
- * const browser = await chromium.launch();
- * const page = await browser.newPage();
- * await page.goto('http://localhost:5173'); // 加载包含 MathJax 的页面
- * 
- * const html = await page.evaluate(async (md) => {
- *   const { convertDefault } = await import('@yourname/markmuse-wechat-headless');
- *   return await convertDefault(md);
- * }, markdown);
  * ```
  */
 
 // 直接引用现有代码，不复制
-import { convertToWeChatHTMLHeadless } from '../src/utils/wechatExportHeadless';
+import { convertToWeChatHTMLHeadless } from '../../src/utils/wechatExportHeadless';
+
 // 导出时使用短名称（仅 npm 包使用，不影响主项目）
 export { convertToWeChatHTMLHeadless as convert };
-
-// 如果需要，也可以导出其他工具函数
-export { initMathJax } from '../src/utils/wechatExport';
 
 // 默认主题样式（用于 npm 包，提供开箱即用的体验）
 const DEFAULT_THEME_CSS = `
@@ -228,31 +215,6 @@ const DEFAULT_THEME_CSS = `
   border-radius: 8px;
   margin: 1rem 0;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
-}
-
-/* 公式样式 */
-.block-equation {
-  text-align: center;
-  overflow-x: auto;
-  overflow-y: auto;
-  display: block;
-  margin: 1em 0;
-}
-
-.inline-equation {
-  display: inline;
-}
-
-/* section 容器样式 */
-#nice {
-  margin: 0;
-  padding: 10px;
-  font-family: Optima, "Microsoft YaHei", PingFangSC-regular, serif;
-  font-size: 16px;
-  color: rgb(0, 0, 0);
-  line-height: 1.5em;
-  word-break: break-word;
-  overflow-wrap: break-word;
 }
 `.trim();
 

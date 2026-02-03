@@ -1,5 +1,5 @@
 {
-    "name": "@yourname/markmuse-wechat-headless",
+    "name": "markmuse-wechat",
     "version": "1.0.0",
     "description": "Convert Markdown to WeChat Official Account HTML format (requires browser environment)",
     "type": "module",
@@ -9,6 +9,10 @@
         ".": {
             "import": "./dist/index.js",
             "types": "./dist/index.d.ts"
+        },
+        "./converter": {
+            "import": "./dist/converter.js",
+            "types": "./dist/converter.d.ts"
         }
     },
     "files": [
@@ -23,11 +27,11 @@
         "converter",
         "headless"
     ],
-    "author": "Your Name",
+    "author": "shalom-lab",
     "license": "MIT",
     "repository": {
         "type": "git",
-        "url": "https://github.com/yourname/markmuse"
+        "url": "https://github.com/shalom-lab/markmuse"
     },
     "peerDependencies": {
         "mathjax": "^3.0.0"
@@ -36,7 +40,8 @@
         "juice": "^11.0.3",
         "markdown-it": "^14.1.0",
         "highlight.js": "^11.11.1",
-        "katex": "^0.16.27"
+        "katex": "^0.16.27",
+        "playwright": "^1.40.0"
     },
     "devDependencies": {
         "typescript": "^5.2.2",
@@ -44,9 +49,13 @@
         "@types/node": "^20.0.0"
     },
     "scripts": {
-        "build": "vite build",
+        "build": "vite build && vite build --config vite.bundle.config.ts && tsc -p tsconfig.converter.json",
+        "build:lib": "vite build",
+        "build:bundle": "vite build --config vite.bundle.config.ts",
+        "build:converter": "tsc -p tsconfig.converter.json",
         "type-check": "tsc --noEmit",
         "preview": "vite preview",
-        "test": "vite --config vite.dev.config.ts"
+        "test:node": "node test-local.js",
+        "test:browser": "echo '请在浏览器中打开 test-browser.html 文件进行测试'"
     }
 }

@@ -13,7 +13,7 @@
     }
   },
   "include": [
-    "index.ts",
+    "src/**/*.ts",
     "../src/utils/wechatExportHeadless.ts",
     "../src/utils/wechatExport.ts",
     "../src/utils/markdown-it-math.ts"

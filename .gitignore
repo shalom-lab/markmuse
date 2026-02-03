@@ -12,4 +12,4 @@ dist
 
 lib/node_modules
 lib/dist
-lib/.markmuse
+lib/.npmrc

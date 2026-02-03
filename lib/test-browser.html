@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MarkMuse 浏览器环境测试</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .test-section {
+      margin-bottom: 30px;
+      padding: 20px;
+      border: 2px solid #e0e0e0;
+      border-radius: 6px;
+    }
+    .test-section h2 {
+      margin-top: 0;
+      color: #333;
+      border-bottom: 2px solid #667eea;
+      padding-bottom: 10px;
+    }
+    .status {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-left: 10px;
+    }
+    .status.success {
+      background: #4caf50;
+      color: white;
+    }
+    .status.error {
+      background: #f44336;
+      color: white;
+    }
+    .status.pending {
+      background: #ff9800;
+      color: white;
+    }
+    button {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      margin-right: 10px;
+    }
+    button:hover {
+      background: #5568d3;
+    }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    .output {
+      margin-top: 15px;
+      padding: 15px;
+      background: #f9f9f9;
+      border-radius: 4px;
+      border: 1px solid #e0e0e0;
+      max-height: 400px;
+      overflow: auto;
+    }
+    .output pre {
+      margin: 0;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .preview {
+      margin-top: 15px;
+      padding: 15px;
+      background: white;
+      border: 1px solid #e0e0e0;
+      border-radius: 4px;
+    }
+    .info {
+      background: #e3f2fd;
+      border-left: 4px solid #2196f3;
+      padding: 15px;
+      margin-bottom: 20px;
+      border-radius: 4px;
+    }
+    .info code {
+      background: rgba(0,0,0,0.1);
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
+    /* 确保公式 SVG 可见 */
+    .block-equation,
+    .inline-equation {
+      color: #333333;
+    }
+    .block-equation svg,
+    .inline-equation svg {
+      display: inline-block;
+      vertical-align: middle;
+      color: inherit;
+      fill: currentColor;
+      max-width: 100%;
+      height: auto;
+      min-width: 1px;
+      min-height: 1px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>MarkMuse 浏览器环境测试</h1>
+    
+    <div class="info">
+      <h3>📋 测试说明</h3>
+      <p>此页面用于测试 <code>dist/bundle.iife.js</code> 在浏览器环境中的兼容性。</p>
+      <p><strong>测试目标：</strong>验证打包后的 IIFE bundle 是否能在浏览器中正常运行，所有依赖都已打包，没有 Node.js 特有的依赖。</p>
+      <p><strong>使用方法：</strong>确保已运行 <code>npm run build</code> 构建库文件，然后点击下方测试按钮。</p>
+    </div>
+
+    <div class="test-section">
+      <h2>
+        测试 1: 模块加载测试
+        <span class="status pending" id="loadStatus">待测试</span>
+      </h2>
+      <p>验证能否成功加载 <code>dist/bundle.iife.js</code> bundle</p>
+      <button onclick="testModuleLoad()">开始测试</button>
+      <div class="output" id="loadOutput" style="display: none;"></div>
+    </div>
+
+    <div class="test-section">
+      <h2>
+        测试 2: 转换功能测试（默认样式）
+        <span class="status pending" id="convertStatus">待测试</span>
+      </h2>
+      <p>验证 <code>convertDefault</code> 函数能否正常工作</p>
+      <button onclick="testConvertDefault()" id="convertBtn" disabled>开始测试</button>
+      <button onclick="copyToWeChat('default')" id="copyDefaultBtn" disabled style="background: #4caf50;">📋 复制到公众号</button>
+      <div class="output" id="convertOutput" style="display: none;"></div>
+      <div class="preview" id="convertPreview" style="display: none;"></div>
+    </div>
+
+    <div class="test-section">
+      <h2>
+        测试 3: 转换功能测试（自定义 CSS）
+        <span class="status pending" id="customStatus">待测试</span>
+      </h2>
+      <p>验证 <code>convert</code> 函数能否正常工作</p>
+      <button onclick="testConvertCustom()" id="customBtn" disabled>开始测试</button>
+      <button onclick="copyToWeChat('custom')" id="copyCustomBtn" disabled style="background: #4caf50;">📋 复制到公众号</button>
+      <div class="output" id="customOutput" style="display: none;"></div>
+      <div class="preview" id="customPreview" style="display: none;"></div>
+    </div>
+  </div>
+
+  <!-- 加载 MathJax -->
+  <script>
+    // 配置 MathJax：生成完整的 path，不使用 use 引用
+    // 这样可以避免符号定义丢失的问题
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$']],
+        displayMath: [['$$', '$$']]
+      },
+      svg: {
+        fontCache: 'none'  // 关键：生成完整的 path，不使用 use 引用
+      }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+  
+  <!-- 加载 bundle (IIFE 格式，会挂载到 window.MarkMuse) -->
+  <script src="./dist/bundle.iife.js"></script>
+
+  <script type="module">
+    let convert, convertDefault;
+    let moduleLoaded = false;
+    let lastConvertedHtml = {
+      default: null,
+      custom: null
+    };
+
+    const testMarkdown = `
+# 测试标题
+
+这是包含**数学公式**的内容：$E = mc^2$
+
+块级公式：
+
+$$
+\\int_{-\\infty}^{\\infty} e^{-x^2} dx = \\sqrt{\\pi}
+$$
+
+\`\`\`javascript
+console.log("Hello MarkMuse");
+\`\`\`
+
+> 这是一个引用测试
+`;
+
+    const customCss = `
+#markmuse {
+  background: #f0f0f0;
+  padding: 20px;
+}
+#markmuse h1 {
+  color: #ff6b6b;
+}
+`;
+
+    // 测试 1: 模块加载
+    window.testModuleLoad = async function() {
+      const statusEl = document.getElementById('loadStatus');
+      const outputEl = document.getElementById('loadOutput');
+      
+      statusEl.textContent = '测试中...';
+      statusEl.className = 'status pending';
+      outputEl.style.display = 'block';
+      outputEl.innerHTML = '<pre>正在加载 bundle...</pre>';
+
+      try {
+        // bundle.iife.js 会将函数挂载到 window.MarkMuse
+        if (typeof window.MarkMuse === 'object' && window.MarkMuse !== null) {
+          convert = window.MarkMuse.convert;
+          convertDefault = window.MarkMuse.convertDefault;
+
+          if (typeof convert === 'function' && typeof convertDefault === 'function') {
+            moduleLoaded = true;
+            statusEl.textContent = '✅ 通过';
+            statusEl.className = 'status success';
+            outputEl.innerHTML = '<pre>✅ Bundle 加载成功！\n\n导出的函数：\n- convert: ' + typeof convert + '\n- convertDefault: ' + typeof convertDefault + '\n\n函数已挂载到 window.MarkMuse</pre>';
+            
+            // 启用其他测试按钮
+            document.getElementById('convertBtn').disabled = false;
+            document.getElementById('customBtn').disabled = false;
+          } else {
+            throw new Error('函数未正确导出到 window.MarkMuse');
+          }
+        } else {
+          throw new Error('window.MarkMuse 未定义，请确保 bundle.iife.js 已正确加载');
+        }
+      } catch (error) {
+        statusEl.textContent = '❌ 失败';
+        statusEl.className = 'status error';
+        outputEl.innerHTML = '<pre>❌ Bundle 加载失败：\n\n' + error.message + '\n\n' + (error.stack || '') + '\n\n请确保已运行 npm run build 构建 bundle.iife.js</pre>';
+      }
+    };
+
+    // 测试 2: convertDefault
+    window.testConvertDefault = async function() {
+      if (!moduleLoaded) {
+        alert('请先完成模块加载测试');
+        return;
+      }
+
+      const statusEl = document.getElementById('convertStatus');
+      const outputEl = document.getElementById('convertOutput');
+      const previewEl = document.getElementById('convertPreview');
+      
+      statusEl.textContent = '测试中...';
+      statusEl.className = 'status pending';
+      outputEl.style.display = 'block';
+      outputEl.innerHTML = '<pre>正在转换...</pre>';
+
+      try {
+        // 等待 MathJax 加载
+        await new Promise((resolve) => {
+          if (window.MathJax && typeof window.MathJax.tex2svg === 'function') {
+            resolve();
+          } else {
+            const check = setInterval(() => {
+              if (window.MathJax && typeof window.MathJax.tex2svg === 'function') {
+                clearInterval(check);
+                resolve();
+              }
+            }, 100);
+            setTimeout(() => {
+              clearInterval(check);
+              resolve();
+            }, 5000);
+          }
+        });
+
+        const html = await convertDefault(testMarkdown);
+        
+        // 保存转换结果，供复制功能使用
+        lastConvertedHtml.default = html;
+        
+        statusEl.textContent = '✅ 通过';
+        statusEl.className = 'status success';
+        outputEl.innerHTML = '<pre>' + escapeHtml(html.substring(0, 500)) + '...\n\n(完整 HTML 已显示在下方预览区域)</pre>';
+        previewEl.style.display = 'block';
+        previewEl.innerHTML = html;
+        
+        // 启用复制按钮
+        document.getElementById('copyDefaultBtn').disabled = false;
+      } catch (error) {
+        statusEl.textContent = '❌ 失败';
+        statusEl.className = 'status error';
+        outputEl.innerHTML = '<pre>❌ 转换失败：\n\n' + error.message + '\n\n' + error.stack + '</pre>';
+      }
+    };
+
+    // 测试 3: convert (自定义 CSS)
+    window.testConvertCustom = async function() {
+      if (!moduleLoaded) {
+        alert('请先完成模块加载测试');
+        return;
+      }
+
+      const statusEl = document.getElementById('customStatus');
+      const outputEl = document.getElementById('customOutput');
+      const previewEl = document.getElementById('customPreview');
+      
+      statusEl.textContent = '测试中...';
+      statusEl.className = 'status pending';
+      outputEl.style.display = 'block';
+      outputEl.innerHTML = '<pre>正在转换...</pre>';
+
+      try {
+        // 等待 MathJax 加载
+        await new Promise((resolve) => {
+          if (window.MathJax && typeof window.MathJax.tex2svg === 'function') {
+            resolve();
+          } else {
+            const check = setInterval(() => {
+              if (window.MathJax && typeof window.MathJax.tex2svg === 'function') {
+                clearInterval(check);
+                resolve();
+              }
+            }, 100);
+            setTimeout(() => {
+              clearInterval(check);
+              resolve();
+            }, 5000);
+          }
+        });
+
+        const html = await convert(testMarkdown, customCss);
+        
+        // 保存转换结果，供复制功能使用
+        lastConvertedHtml.custom = html;
+        
+        statusEl.textContent = '✅ 通过';
+        statusEl.className = 'status success';
+        outputEl.innerHTML = '<pre>' + escapeHtml(html.substring(0, 500)) + '...\n\n(完整 HTML 已显示在下方预览区域)</pre>';
+        previewEl.style.display = 'block';
+        previewEl.innerHTML = html;
+        
+        // 启用复制按钮
+        document.getElementById('copyCustomBtn').disabled = false;
+      } catch (error) {
+        statusEl.textContent = '❌ 失败';
+        statusEl.className = 'status error';
+        outputEl.innerHTML = '<pre>❌ 转换失败：\n\n' + error.message + '\n\n' + error.stack + '</pre>';
+      }
+    };
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // 复制到公众号功能（参考主项目的 copyToClipboard 实现）
+    window.copyToWeChat = async function(type) {
+      const html = lastConvertedHtml[type];
+      if (!html) {
+        alert('请先完成转换测试');
+        return;
+      }
+
+      try {
+        // 从 HTML 中提取纯文本
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = html;
+        const plainText = tempDiv.innerText || tempDiv.textContent || '';
+
+        // 使用 copySafari 方法（支持富文本和多格式）
+        const success = await copySafari(html, plainText, testMarkdown);
+
+        if (success) {
+          alert('✅ 已复制到剪贴板！\n\n现在可以粘贴到微信公众号编辑器中了。\n\n提示：在公众号编辑器中，公式应该能正常显示。');
+        } else {
+          alert('❌ 复制失败，请重试');
+        }
+      } catch (error) {
+        console.error('复制失败:', error);
+        alert('❌ 复制失败：' + error.message);
+      }
+    };
+
+    // 复制到剪贴板（参考主项目的 copySafari 实现）
+    function copySafari(html, plainText, markdown) {
+      return new Promise((resolve) => {
+        let resolved = false;
+        
+        // 获取或创建 input 元素
+        let input = document.getElementById('copy-input');
+        if (!input) {
+          input = document.createElement('input');
+          input.id = 'copy-input';
+          input.style.position = 'absolute';
+          input.style.left = '-1000px';
+          input.style.zIndex = '-1000';
+          document.body.appendChild(input);
+        }
+        
+        // 让 input 选中一个字符
+        input.value = 'NOTHING';
+        input.setSelectionRange(0, 1);
+        input.focus();
+        
+        // 复制触发
+        const copyHandler = (e) => {
+          e.preventDefault();
+          if (e.clipboardData) {
+            e.clipboardData.setData('text/html', html);
+            e.clipboardData.setData('text/plain', plainText || html);
+            if (markdown) {
+              e.clipboardData.setData('text/markdown', markdown);
+            }
+          }
+          document.removeEventListener('copy', copyHandler);
+          if (!resolved) {
+            resolved = true;
+            resolve(true);
+          }
+        };
+        
+        document.addEventListener('copy', copyHandler);
+        
+        try {
+          const success = document.execCommand('copy');
+          if (!success && !resolved) {
+            setTimeout(() => {
+              if (navigator.clipboard && !resolved) {
+                const textArea = document.createElement('textarea');
+                textArea.value = html;
+                textArea.style.position = 'fixed';
+                textArea.style.left = '-999999px';
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                  document.execCommand('copy');
+                  document.body.removeChild(textArea);
+                  if (!resolved) {
+                    resolved = true;
+                    resolve(true);
+                  }
+                } catch (err) {
+                  document.body.removeChild(textArea);
+                  if (!resolved) {
+                    resolved = true;
+                    resolve(false);
+                  }
+                }
+              } else if (!resolved) {
+                resolved = true;
+                resolve(false);
+              }
+            }, 100);
+          }
+        } catch (err) {
+          console.error('复制失败:', err);
+          if (!resolved) {
+            resolved = true;
+            resolve(false);
+          }
+        }
+      });
+    }
+  </script>
+</body>
+</html>
+
