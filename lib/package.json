@@ -1,6 +1,6 @@
 {
     "name": "markmuse-wechat",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "Convert Markdown to WeChat Official Account HTML format (requires browser environment)",
     "type": "module",
     "main": "./dist/index.js",
