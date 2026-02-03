@@ -17,10 +17,15 @@
 
 ```bash
 cd lib
-echo "//registry.npmjs.org/:_authToken=YOUR_NPM_TOKEN" > .npmrc
+cat > .npmrc << EOF
+registry=https://registry.npmjs.org/
+//registry.npmjs.org/:_authToken=YOUR_NPM_TOKEN
+EOF
 ```
 
-⚠️ **注意**：`.npmrc` 已添加到 `.gitignore`，不会提交到仓库。
+⚠️ **重要**：
+- `.npmrc` 已添加到 `.gitignore`，不会提交到仓库
+- **必须使用官方 registry**（`registry.npmjs.org`），不能使用镜像源（如 `npmmirror.com`）
 
 或者使用环境变量：
 

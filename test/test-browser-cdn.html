@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MarkMuse WeChat - CDN 方式测试</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            opacity: 0.9;
+        }
+
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0;
+            min-height: 600px;
+        }
+
+        @media (max-width: 768px) {
+            .content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel {
+            padding: 1.5rem;
+            overflow-y: auto;
+            max-height: 600px;
+        }
+
+        .input-panel {
+            background: #f8f9fa;
+            border-right: 1px solid #e9ecef;
+        }
+
+        .output-panel {
+            background: white;
+        }
+
+        .panel h2 {
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+            color: #333;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #667eea;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 400px;
+            padding: 1rem;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-family: "SF Mono", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            resize: vertical;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .preview {
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            padding: 1rem;
+            min-height: 400px;
+            background: white;
+        }
+
+        /* 确保代码块样式正确显示 */
+        .preview .hljs,
+        .preview pre.hljs {
+            display: block;
+            overflow-x: auto;
+            padding: 2.5rem 1rem 1rem 1rem;
+            background-color: #2d2d2d;
+            border-radius: 8px;
+            position: relative;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .preview .hljs code {
+            background-color: transparent;
+            padding: 0;
+            font-size: 0.9em;
+            color: #e8e8e8;
+            font-family: "SF Mono", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        /* highlight.js 语法高亮样式（作为后备） */
+        .preview .hljs-comment,
+        .preview .hljs-quote {
+            color: #6a9955;
+        }
+
+        .preview .hljs-variable,
+        .preview .hljs-template-variable,
+        .preview .hljs-tag,
+        .preview .hljs-name,
+        .preview .hljs-selector-id,
+        .preview .hljs-selector-class,
+        .preview .hljs-regexp,
+        .preview .hljs-deletion {
+            color: #f48771;
+        }
+
+        .preview .hljs-number,
+        .preview .hljs-built_in,
+        .preview .hljs-builtin-name,
+        .preview .hljs-literal,
+        .preview .hljs-type,
+        .preview .hljs-params,
+        .preview .hljs-meta,
+        .preview .hljs-link {
+            color: #b5cea8;
+        }
+
+        .preview .hljs-attribute {
+            color: #9cdcfe;
+        }
+
+        .preview .hljs-string,
+        .preview .hljs-symbol,
+        .preview .hljs-bullet,
+        .preview .hljs-addition {
+            color: #ce9178;
+        }
+
+        .preview .hljs-title,
+        .preview .hljs-section {
+            color: #dcdcaa;
+        }
+
+        .preview .hljs-keyword,
+        .preview .hljs-selector-tag {
+            color: #569cd6;
+        }
+
+        .preview .hljs-emphasis {
+            font-style: italic;
+        }
+
+        .preview .hljs-strong {
+            font-weight: bold;
+        }
+
+        .controls {
+            padding: 1.5rem;
+            background: #f8f9fa;
+            border-top: 1px solid #e9ecef;
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .status {
+            padding: 1rem 1.5rem;
+            background: #e7f3ff;
+            border-left: 4px solid #2196F3;
+            margin-bottom: 1rem;
+            border-radius: 4px;
+        }
+
+        .status.success {
+            background: #d4edda;
+            border-left-color: #28a745;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            border-left-color: #dc3545;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 MarkMuse WeChat</h1>
+            <p>CDN 方式测试 - 浏览器环境</p>
+        </div>
+
+        <div id="status" class="status hidden"></div>
+
+        <div class="content">
+            <div class="panel input-panel">
+                <h2>📝 Markdown 输入</h2>
+                <textarea id="markdownInput" placeholder="输入 Markdown 内容..."># MarkMuse WeChat 测试
+
+这是一个**CDN 方式**的测试页面。
+
+## 文本格式
+
+这是**粗体文本**，这是*斜体文本*，这是`行内代码`。
+
+## 数学公式
+
+### 行内公式
+
+爱因斯坦的质能方程：$E = mc^2$
+
+勾股定理：$a^2 + b^2 = c^2$
+
+### 块级公式
+
+$$
+\int_{-\infty}^{\infty} e^{-x^2} dx = \sqrt{\pi}
+$$
+
+$$
+\sum_{i=1}^{n} i = \frac{n(n+1)}{2}
+$$
+
+## 代码块
+
+```javascript
+// JavaScript 示例
+function fibonacci(n) {
+  if (n <= 1) return n;
+  return fibonacci(n - 1) + fibonacci(n - 2);
+}
+
+console.log(fibonacci(10)); // 55
+```
+
+```python
+# Python 示例
+def quick_sort(arr):
+    if len(arr) <= 1:
+        return arr
+    pivot = arr[len(arr) // 2]
+    left = [x for x in arr if x < pivot]
+    middle = [x for x in arr if x == pivot]
+    right = [x for x in arr if x > pivot]
+    return quick_sort(left) + middle + quick_sort(right)
+```
+
+## 列表
+
+- 第一项
+- 第二项
+  - 嵌套项 1
+  - 嵌套项 2
+- 第三项
+
+## 表格
+
+| 功能 | 支持 | 说明 |
+|------|------|------|
+| Markdown | ✅ | 完整支持 |
+| 数学公式 | ✅ | LaTeX 语法 |
+| 代码高亮 | ✅ | highlight.js |
+
+## 引用
+
+> 这是一段引用文本。
+> 
+> 可以包含多行内容。
+
+---
+
+**测试完成！** 这个页面使用 CDN 方式加载 markmuse-wechat。</textarea>
+            </div>
+
+            <div class="panel output-panel">
+                <h2>✨ 预览效果</h2>
+                <div id="preview" class="preview">
+                    <p style="color: #999; text-align: center; padding: 2rem;">
+                        点击"转换"按钮查看预览效果
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="btn-primary" onclick="convert()">
+                🔄 转换
+            </button>
+            <button class="btn-secondary" onclick="loadExample()">
+                📄 加载示例
+            </button>
+            <button class="btn-secondary" onclick="clearAll()">
+                🗑️ 清空
+            </button>
+            <button class="btn-secondary" onclick="copyToWeChat()">
+                📋 复制到微信公众号
+            </button>
+        </div>
+    </div>
+
+    <!-- MathJax 配置和加载 -->
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$']],
+                displayMath: [['$$', '$$']]
+            },
+            svg: {
+                fontCache: 'none'  // 关键：生成完整的 path，不使用 use 引用
+            }
+        };
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+
+    <!-- MarkMuse WeChat CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/markmuse-wechat/dist/bundle.iife.js"></script>
+
+    <script>
+        let isConverting = false;
+        let lastConvertedHtml = null;  // 保存转换后的 HTML，供复制功能使用
+
+        function showStatus(message, type = 'info') {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+            statusEl.classList.remove('hidden');
+            
+            if (type === 'success' || type === 'error') {
+                setTimeout(() => {
+                    statusEl.classList.add('hidden');
+                }, 3000);
+            }
+        }
+
+        async function convert() {
+            if (isConverting) {
+                showStatus('正在转换中，请稍候...', 'info');
+                return;
+            }
+
+            const markdown = document.getElementById('markdownInput').value.trim();
+            
+            if (!markdown) {
+                showStatus('请输入 Markdown 内容', 'error');
+                return;
+            }
+
+            // 检查 MarkMuse 是否已加载
+            if (!window.MarkMuse || !window.MarkMuse.convertDefault) {
+                showStatus('MarkMuse 未加载，请检查 CDN 连接', 'error');
+                return;
+            }
+
+            // 检查 MathJax 是否已加载
+            if (!window.MathJax || typeof window.MathJax.tex2svg !== 'function') {
+                showStatus('MathJax 未加载，请检查 CDN 连接', 'error');
+                return;
+            }
+
+            isConverting = true;
+            const previewEl = document.getElementById('preview');
+            previewEl.innerHTML = '<div style="text-align: center; padding: 2rem;"><div class="loading"></div>正在转换...</div>';
+
+            try {
+                // 使用默认样式转换
+                const html = await window.MarkMuse.convertDefault(markdown);
+                
+                // 保存转换结果，供复制功能使用
+                lastConvertedHtml = html;
+                
+                previewEl.innerHTML = html;
+                showStatus('✅ 转换成功！', 'success');
+            } catch (error) {
+                console.error('转换失败:', error);
+                previewEl.innerHTML = `
+                    <div style="color: #dc3545; padding: 1rem;">
+                        <h3>转换失败</h3>
+                        <p>${error.message}</p>
+                        <pre style="background: #f8f9fa; padding: 1rem; margin-top: 1rem; border-radius: 4px; overflow-x: auto;">${error.stack}</pre>
+                    </div>
+                `;
+                showStatus('❌ 转换失败：' + error.message, 'error');
+            } finally {
+                isConverting = false;
+            }
+        }
+
+        async function convertWithCustomCss() {
+            const markdown = document.getElementById('markdownInput').value.trim();
+            const customCss = `
+                #markmuse {
+                    font-family: "Microsoft YaHei", Arial, sans-serif;
+                    color: #2c3e50;
+                }
+            `;
+            
+            try {
+                const html = await window.MarkMuse.convertDefault(markdown, customCss);
+                document.getElementById('preview').innerHTML = html;
+                showStatus('✅ 使用自定义样式转换成功！', 'success');
+            } catch (error) {
+                showStatus('❌ 转换失败：' + error.message, 'error');
+            }
+        }
+
+        function loadExample() {
+            const example = `# 完整示例
+
+## 数学公式测试
+
+行内公式：$E = mc^2$，$\\sum_{i=1}^{n} i = \\frac{n(n+1)}{2}$
+
+块级公式：
+$$
+\\int_0^1 x^2 dx = \\frac{1}{3}
+$$
+
+$$
+\\begin{pmatrix}
+a & b \\\\
+c & d
+\\end{pmatrix}
+$$
+
+## 代码示例
+
+\`\`\`javascript
+// 快速排序
+function quickSort(arr) {
+  if (arr.length <= 1) return arr;
+  const pivot = arr[Math.floor(arr.length / 2)];
+  const left = arr.filter(x => x < pivot);
+  const middle = arr.filter(x => x === pivot);
+  const right = arr.filter(x => x > pivot);
+  return [...quickSort(left), ...middle, ...quickSort(right)];
+}
+\`\`\`
+
+## 列表和表格
+
+1. 第一项
+2. 第二项
+3. 第三项
+
+| 算法 | 时间复杂度 |
+|------|------------|
+| 冒泡排序 | $O(n^2)$ |
+| 快速排序 | $O(n \\log n)$ |
+
+> 这是一个引用块
+
+**测试完成！**`;
+            
+            document.getElementById('markdownInput').value = example;
+            showStatus('📄 示例已加载', 'success');
+        }
+
+        function clearAll() {
+            document.getElementById('markdownInput').value = '';
+            document.getElementById('preview').innerHTML = '<p style="color: #999; text-align: center; padding: 2rem;">点击"转换"按钮查看预览效果</p>';
+            showStatus('🗑️ 已清空', 'success');
+        }
+
+        async function copyToWeChat() {
+            const html = lastConvertedHtml;
+            
+            if (!html) {
+                showStatus('请先转换 Markdown', 'error');
+                return;
+            }
+
+            try {
+                // 从 HTML 中提取纯文本
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = html;
+                const plainText = tempDiv.innerText || tempDiv.textContent || '';
+
+                // 获取原始 Markdown
+                const markdown = document.getElementById('markdownInput').value.trim();
+
+                // 使用 copySafari 方法（支持富文本和多格式）
+                const success = await copySafari(html, plainText, markdown);
+
+                if (success) {
+                    showStatus('✅ 已复制到剪贴板！现在可以粘贴到微信公众号编辑器中了', 'success');
+                } else {
+                    showStatus('❌ 复制失败，请重试', 'error');
+                }
+            } catch (error) {
+                console.error('复制失败:', error);
+                showStatus('❌ 复制失败：' + error.message, 'error');
+            }
+        }
+
+        // 复制到剪贴板（参考 lib/test-browser.html 的 copySafari 实现）
+        function copySafari(html, plainText, markdown) {
+            return new Promise((resolve) => {
+                let resolved = false;
+                
+                // 获取或创建 input 元素
+                let input = document.getElementById('copy-input');
+                if (!input) {
+                    input = document.createElement('input');
+                    input.id = 'copy-input';
+                    input.style.position = 'absolute';
+                    input.style.left = '-1000px';
+                    input.style.zIndex = '-1000';
+                    document.body.appendChild(input);
+                }
+                
+                // 让 input 选中一个字符
+                input.value = 'NOTHING';
+                input.setSelectionRange(0, 1);
+                input.focus();
+                
+                // 复制触发
+                const copyHandler = (e) => {
+                    e.preventDefault();
+                    if (e.clipboardData) {
+                        e.clipboardData.setData('text/html', html);
+                        e.clipboardData.setData('text/plain', plainText || html);
+                        if (markdown) {
+                            e.clipboardData.setData('text/markdown', markdown);
+                        }
+                    }
+                    document.removeEventListener('copy', copyHandler);
+                    if (!resolved) {
+                        resolved = true;
+                        resolve(true);
+                    }
+                };
+                
+                document.addEventListener('copy', copyHandler);
+                
+                try {
+                    const success = document.execCommand('copy');
+                    if (!success && !resolved) {
+                        setTimeout(() => {
+                            if (navigator.clipboard && !resolved) {
+                                const textArea = document.createElement('textarea');
+                                textArea.value = html;
+                                textArea.style.position = 'fixed';
+                                textArea.style.left = '-999999px';
+                                document.body.appendChild(textArea);
+                                textArea.select();
+                                try {
+                                    document.execCommand('copy');
+                                    document.body.removeChild(textArea);
+                                    if (!resolved) {
+                                        resolved = true;
+                                        resolve(true);
+                                    }
+                                } catch (err) {
+                                    document.body.removeChild(textArea);
+                                    if (!resolved) {
+                                        resolved = true;
+                                        resolve(false);
+                                    }
+                                }
+                            } else if (!resolved) {
+                                resolved = true;
+                                resolve(false);
+                            }
+                        }, 100);
+                    }
+                } catch (err) {
+                    console.error('复制失败:', err);
+                    if (!resolved) {
+                        resolved = true;
+                        resolve(false);
+                    }
+                }
+            });
+        }
+
+        // 页面加载完成后检查依赖
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                if (window.MathJax && typeof window.MathJax.tex2svg === 'function') {
+                    showStatus('✅ MathJax 已加载', 'success');
+                } else {
+                    showStatus('⚠️ MathJax 加载中...', 'info');
+                }
+
+                if (window.MarkMuse && window.MarkMuse.convertDefault) {
+                    showStatus('✅ MarkMuse 已加载，可以开始转换', 'success');
+                } else {
+                    showStatus('⚠️ MarkMuse 加载中...', 'info');
+                }
+            }, 1000);
+        });
+
+        // 支持 Ctrl+Enter 快捷键转换
+        document.getElementById('markdownInput').addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'Enter') {
+                convert();
+            }
+        });
+    </script>
+</body>
+</html>
+

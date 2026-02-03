@@ -1,0 +1,13 @@
+{
+  "name": "markmuse-wechat-test",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "测试 markmuse-wechat 包",
+  "scripts": {
+    "test": "node test.js"
+  },
+  "dependencies": {
+    "markmuse-wechat": "^1.0.0"
+  }
+}
+

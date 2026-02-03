@@ -13,3 +13,5 @@ dist
 lib/node_modules
 lib/dist
 lib/.npmrc
+
+test/node_modules

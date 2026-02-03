@@ -1,7 +1,6 @@
 # markmuse-wechat
 
-将 Markdown 转换为微信公众号格式的 HTML（无头版本）
-
+将 Markdown 转换为微信公众号格式的 HTML
 ## 安装
 
 ```bash
