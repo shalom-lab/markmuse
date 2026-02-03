@@ -108,20 +108,57 @@ async function convertLatexToSVGAsync(latex: string, isDisplay: boolean): Promis
       svgEl.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
     }
     
+    // 确保 SVG 有正确的 fill 颜色（使用 currentColor 以继承文本颜色）
+    // 如果 SVG 内部没有 fill 属性，设置默认的 fill
+    const hasFill = svgEl.querySelector('[fill]') || svgEl.hasAttribute('fill');
+    if (!hasFill) {
+      // 检查所有子元素是否有 fill
+      const allElements = svgEl.querySelectorAll('*');
+      let hasAnyFill = false;
+      for (const el of Array.from(allElements)) {
+        if (el.hasAttribute('fill') && el.getAttribute('fill') !== 'none') {
+          hasAnyFill = true;
+          break;
+        }
+      }
+      // 如果没有找到任何 fill，为 SVG 根元素设置 fill="currentColor"
+      if (!hasAnyFill) {
+        svgEl.setAttribute('fill', 'currentColor');
+      }
+    }
+    
     // 确保 SVG 有正确的样式属性，使其能够正确显示
-    if (!svgEl.hasAttribute('style')) {
-      svgEl.setAttribute('style', 'vertical-align: middle;');
+    // 注意：颜色由外层容器统一控制，这里只设置必要的排版属性
+    const existingStyle = svgEl.getAttribute('style') || '';
+    const styleParts = existingStyle ? [existingStyle] : [];
+    
+    // 垂直对齐：确保行内公式与文字基线对齐
+    if (!existingStyle.includes('vertical-align')) {
+      styleParts.push('vertical-align: middle;');
+    }
+    // 最小尺寸：防止在某些布局下 SVG 被压缩为 0
+    if (!existingStyle.includes('min-width')) {
+      styleParts.push('min-width: 1px;');
+    }
+    if (!existingStyle.includes('min-height')) {
+      styleParts.push('min-height: 1px;');
+    }
+    
+    if (styleParts.length > 0) {
+      svgEl.setAttribute('style', styleParts.join(' '));
     }
     
     const finalSVG = svgEl.outerHTML;
     const escapedLatex = latex.replace(/"/g, '&quot;');
     
-    // 块级公式需要居中显示，这是功能性样式，写死
+    // 返回包装后的 HTML，统一在外层容器控制颜色
+    // 这样 SVG 的 fill="currentColor" 可以自动继承外层容器的颜色
     if (isDisplay) {
-      return `<section class="block-equation" data-formula="${escapedLatex}" style="text-align: center; overflow-x: auto; overflow-y: auto; display: block;">${finalSVG}</section>`;
+      // 块级公式：居中显示，设置默认颜色供 currentColor 继承
+      return `<section class="block-equation" data-formula="${escapedLatex}" style="text-align: center; overflow-x: auto; overflow-y: auto; display: block; color: #353535;">${finalSVG}</section>`;
     } else {
-      // 行内公式需要 inline-block 才能正确显示 SVG
-      return `<span class="inline-equation" data-formula="${escapedLatex}" style="display: inline-block; vertical-align: middle;">${finalSVG}</span>`;
+      // 行内公式：inline-block 才能正确显示 SVG，设置默认颜色供 currentColor 继承
+      return `<span class="inline-equation" data-formula="${escapedLatex}" style="display: inline-block; vertical-align: middle; color: #353535;">${finalSVG}</span>`;
     }
   } catch (e) {
     console.error('LaTeX 转 SVG 失败:', e);
