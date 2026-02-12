@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
 import MarkdownIt from 'markdown-it';
-import hljs from 'highlight.js';
 import markdownItMath from '../utils/markdown-it-math';
+import { createHighlightFunction } from '../utils/highlight';
 import CodeMirror from '@uiw/react-codemirror';
 import { css } from '@codemirror/lang-css';
 import { oneDark } from '@codemirror/theme-one-dark';
@@ -81,25 +81,20 @@ export default function MarkdownEditor({
     message: '',
   });
 
-  const md = useRef(new MarkdownIt({
-    html: true,
-    linkify: true,
-    typographer: true, // 恢复 typographer，自定义插件可以正确处理
-    breaks: true,
-    highlight: function (str: string, lang: string): string {
-      if (lang && hljs.getLanguage(lang)) {
-        try {
-          return '<pre class="hljs"><code>' +
-                 hljs.highlight(str, { language: lang, ignoreIllegals: true }).value +
-                 '</code></pre>';
-        } catch (__) {}
-      }
-      return '<pre class="hljs"><code>' + md.current.utils.escapeHtml(str) + '</code></pre>';
-    }
-  }).use(markdownItMath, {
-    throwOnError: false,
-    errorColor: '#cc0000'
-  }));
+  const md = useRef((() => {
+    const mdInstance = new MarkdownIt({
+      html: true,
+      linkify: true,
+      typographer: true, // 恢复 typographer，自定义插件可以正确处理
+      breaks: true
+    });
+    // 设置 highlight 函数，传入 mdInstance 以便使用其 escapeHtml 方法
+    mdInstance.set({ highlight: createHighlightFunction(mdInstance) });
+    return mdInstance.use(markdownItMath, {
+      throwOnError: false,
+      errorColor: '#cc0000'
+    });
+  })());
 
   const [customCss, setCustomCss] = useState(currentTheme.css);
   const { refreshThemes } = useTheme();

@@ -122,6 +122,7 @@ export default function Sidebar({
 
   const tools = [
     { 
+      id: 'markmuse',
       icon: <Logo />, 
       label: 'MarkMuse',
       className: 'mb-6', // 为 logo 添加额外的下边距
@@ -129,11 +130,13 @@ export default function Sidebar({
     },
     // { icon: '↻', label: '同步' },
     { 
+      id: 'wechat',
       icon: <WeChatOfficialAccountIcon className="w-5 h-5" />, 
       label: '公众号',
       onClick: handleWeChatCopy
     },
     { 
+      id: 'wechat-headless',
       icon: <WeChatOfficialAccountIcon className="w-5 h-5" />, 
       label: '公众号',
       onClick: handleWeChatCopyHeadless
@@ -149,7 +152,7 @@ export default function Sidebar({
       <div className="fixed right-0 top-0 bottom-0 w-12 border-l border-gray-200 bg-white flex flex-col items-center py-4 z-50">
         {tools.map((tool) => (
           <button
-            key={tool.label}
+            key={tool.id}
             onClick={tool.onClick}
             className={`w-8 h-8 flex items-center justify-center rounded transition-colors
               ${tool.className || 'mb-6'} 

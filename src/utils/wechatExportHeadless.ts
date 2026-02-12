@@ -1,8 +1,8 @@
 import juice from 'juice';
 import MarkdownIt from 'markdown-it';
-import hljs from 'highlight.js';
 import markdownItMath from './markdown-it-math';
 import { initMathJax } from './wechatExport';
+import { createHighlightFunction, getDefaultHighlightStyles } from './highlight';
 
 // MathJax 类型已在 wechatExport.ts 中声明，这里不需要重复声明
 
@@ -280,18 +280,11 @@ export async function convertToWeChatHTMLHeadless(markdown: string, cssText: str
     html: true,
     linkify: true,
     typographer: true,
-    breaks: true,
-    highlight: function (str: string, lang: string): string {
-      if (lang && hljs.getLanguage(lang)) {
-        try {
-          return '<pre class="hljs"><code>' +
-                 hljs.highlight(str, { language: lang, ignoreIllegals: true }).value +
-                 '</code></pre>';
-        } catch (__) {}
-      }
-      return '<pre class="hljs"><code>' + md.utils.escapeHtml(str) + '</code></pre>';
-    }
-  }).use(markdownItMath, {
+    breaks: true
+  });
+  // 设置 highlight 函数
+  md.set({ highlight: createHighlightFunction(md) });
+  md.use(markdownItMath, {
     throwOnError: false,
     errorColor: '#cc0000'
   });
@@ -370,26 +363,7 @@ export async function convertToWeChatHTMLHeadless(markdown: string, cssText: str
 
   // 获取 highlight.js 的默认样式（用于代码高亮）
   // 在无头环境中，无法从 document.styleSheets 获取，使用默认样式
-  const highlightJsStyles = `
-.hljs {
-  display: block;
-  overflow-x: auto;
-  padding: 0.5em;
-  background: #1e1e1e;
-  color: #d4d4d4;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-}
-.hljs-comment, .hljs-quote { color: #6a9955; }
-.hljs-variable, .hljs-template-variable, .hljs-tag, .hljs-name, .hljs-selector-id, .hljs-selector-class, .hljs-regexp, .hljs-deletion { color: #f48771; }
-.hljs-number, .hljs-built_in, .hljs-builtin-name, .hljs-literal, .hljs-type, .hljs-params, .hljs-meta, .hljs-link { color: #b5cea8; }
-.hljs-attribute { color: #9cdcfe; }
-.hljs-string, .hljs-symbol, .hljs-bullet, .hljs-addition { color: #ce9178; }
-.hljs-title, .hljs-section { color: #dcdcaa; }
-.hljs-keyword, .hljs-selector-tag { color: #569cd6; }
-.hljs-emphasis { font-style: italic; }
-.hljs-strong { font-weight: bold; }
-  `.trim();
+  const highlightJsStyles = getDefaultHighlightStyles();
   
   // 合并传入的 CSS 和 highlight.js 样式
   const fullCss = cssText + '\n' + highlightJsStyles;

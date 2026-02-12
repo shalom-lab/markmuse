@@ -1,0 +1,127 @@
+/* R 语言 Prism token 样式（基于提供的配色方案） */
+
+/* 注释 / 结构性标记 */
+.hljs code.language-r .token.comment,
+.hljs code.language-r .token.prolog,
+.hljs code.language-r .token.doctype,
+.hljs code.language-r .token.cdata {
+  color: #ede2a4; /* tan */
+}
+
+/* 标点 */
+.hljs code.language-r .token.punctuation {
+  color: #abb2bf; /* text-col */
+}
+
+/* 命名空间 */
+.hljs code.language-r .token.namespace {
+  color: #c678dd; /* purple */
+  font-style: italic;
+}
+
+/* 属性 / 关键字 / 标签 */
+.hljs code.language-r .token.property,
+.hljs code.language-r .token.keyword,
+.hljs code.language-r .token.tag {
+  color: #c678dd; /* purple */
+}
+
+/* 类名 */
+.hljs code.language-r .token.class-name {
+  color: #ffffb6;
+  text-decoration: underline;
+}
+
+/* 布尔值 / 常量 */
+.hljs code.language-r .token.boolean,
+.hljs code.language-r .token.constant {
+  color: #e06c75; /* red */
+}
+
+/* 符号 / 删除内容 */
+.hljs code.language-r .token.symbol,
+.hljs code.language-r .token.deleted {
+  color: #f92672;
+}
+
+/* 数字 */
+.hljs code.language-r .token.number {
+  color: #de935f; /* orange */
+}
+
+/* 字符串 */
+.hljs code.language-r .token.string {
+  color: #98c379; /* green */
+}
+
+/* 选择器 / 属性名 / 字符 / 内建 / 插入内容 */
+.hljs code.language-r .token.selector,
+.hljs code.language-r .token.attr-name,
+.hljs code.language-r .token.char,
+.hljs code.language-r .token.builtin,
+.hljs code.language-r .token.inserted {
+  color: #c678dd; /* purple */
+}
+
+/* 变量 */
+.hljs code.language-r .token.variable {
+  color: #c6c5fe;
+}
+
+/* 输出 */
+.hljs code.language-r .token.output {
+  color: #61afef; /* blue */
+}
+
+/* 操作符 */
+.hljs code.language-r .token.operator {
+  color: #e83e8c; /* pink */
+}
+
+/* 实体 */
+.hljs code.language-r .token.entity {
+  color: #ffffb6;
+  cursor: help;
+}
+
+/* URL */
+.hljs code.language-r .token.url {
+  color: #96cbfe;
+}
+
+/* CSS / style 中的字符串 */
+.hljs code.language-r .language-css .token.string,
+.hljs code.language-r .style .token.string {
+  color: #98c379; /* green */
+}
+
+/* 规则 / 属性值 */
+.hljs code.language-r .token.atrule,
+.hljs code.language-r .token.attr-value {
+  color: #f9ee98;
+}
+
+/* 函数 */
+.hljs code.language-r .token.function {
+  color: #61afef; /* blue */
+}
+
+/* 正则 */
+.hljs code.language-r .token.regex {
+  color: #e9c062;
+}
+
+/* 重要标记 */
+.hljs code.language-r .token.important {
+  color: #fd971f;
+}
+
+/* 加粗 / 斜体 */
+.hljs code.language-r .token.important,
+.hljs code.language-r .token.bold {
+  font-weight: bold;
+}
+
+.hljs code.language-r .token.italic {
+  font-style: italic;
+}

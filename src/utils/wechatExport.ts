@@ -1,4 +1,5 @@
 import juice from 'juice';
+import { getDefaultHighlightStyles } from './highlight';
 
 // 声明 MathJax 全局类型
 declare global {
@@ -195,26 +196,7 @@ function getHighlightStyles(): string {
   
   // 如果没有找到样式，使用默认的代码高亮样式
   if (!highlightCss) {
-    highlightCss = `
-.hljs {
-  display: block;
-  overflow-x: auto;
-  padding: 0.5em;
-  background: #1e1e1e;
-  color: #d4d4d4;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-}
-.hljs-comment, .hljs-quote { color: #6a9955; }
-.hljs-variable, .hljs-template-variable, .hljs-tag, .hljs-name, .hljs-selector-id, .hljs-selector-class, .hljs-regexp, .hljs-deletion { color: #f48771; }
-.hljs-number, .hljs-built_in, .hljs-builtin-name, .hljs-literal, .hljs-type, .hljs-params, .hljs-meta, .hljs-link { color: #b5cea8; }
-.hljs-attribute { color: #9cdcfe; }
-.hljs-string, .hljs-symbol, .hljs-bullet, .hljs-addition { color: #ce9178; }
-.hljs-title, .hljs-section { color: #dcdcaa; }
-.hljs-keyword, .hljs-selector-tag { color: #569cd6; }
-.hljs-emphasis { font-style: italic; }
-.hljs-strong { font-weight: bold; }
-    `.trim();
+    highlightCss = getDefaultHighlightStyles();
   }
   
   // 如果没有找到 KaTeX 样式，使用默认的 KaTeX 样式（简化版）

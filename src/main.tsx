@@ -5,6 +5,7 @@ import App from './App';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { initMathJax } from './utils/wechatExport';
 import './index.css';
+import './themes/r-prism.css';
 
 // 预加载 MathJax 以提高导出性能
 initMathJax();
