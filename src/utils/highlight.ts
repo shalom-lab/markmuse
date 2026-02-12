@@ -2,7 +2,7 @@ import hljs from 'highlight.js';
 import MarkdownIt from 'markdown-it';
 // 导入 Prism R 语言支持（这会注册 Prism.languages.r 到全局）
 import './prismr';
-import rPrismCss from '../themes/r-prism.css';
+import rPrismCss from '../themes/r-prism.css?raw';
 
 // 声明 Prism 全局类型
 declare global {
