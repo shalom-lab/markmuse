@@ -308,21 +308,10 @@ export async function ensureBuiltInThemes(): Promise<void> {
         cssWithName = `/* ${theme.name} */\n` + cssWithName;
       }
       
-      if (!existing) {
-        // 文件不存在，创建它
+      if (!existing || existing.trim() !== cssWithName.trim()) {
         await writeTextFile(filePath, cssWithName);
-        console.log(`✅ 恢复内置主题: ${id}.css`);
-      } else {
-        // 文件存在，但需要确保第一行注释是正确的（内置主题的注释应该始终是标准格式）
-        const existingName = extractNameFromCss(existing, theme.name);
-        if (existingName !== theme.name) {
-          // 注释不匹配，更新为标准格式
-          await writeTextFile(filePath, cssWithName);
-          console.log(`✅ 更新内置主题注释: ${id}.css`);
-        }
       }
 
-      // 更新/确保元数据存在
       if (!meta[id]) {
         meta[id] = {
           id,
@@ -330,6 +319,8 @@ export async function ensureBuiltInThemes(): Promise<void> {
           createdAt: now,
           updatedAt: now
         };
+      } else {
+        meta[id].name = theme.name;
       }
     } catch (error) {
       console.error(`确保内置主题失败: ${id}`, error);
