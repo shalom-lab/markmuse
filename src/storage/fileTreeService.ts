@@ -4,7 +4,6 @@ import { listAllEntries, readTextFile, writeTextFile, deleteFile, createDirector
 import type { FileTreeNode } from '../types/type';
 import { FILES_DIR, THEMES_DIR } from '../types/type';
 import { toPhysicalPath, toLogicalPath } from './pathUtils';
-import { getFileBaseline, updateFileBaseline, removeFileBaseline } from './syncBaseline';
 
 // 构建文件树结构（只处理 files/ 目录下的文件）
 export async function buildFileTree(): Promise<FileTreeNode[]> {
@@ -205,15 +204,6 @@ export async function renameFileOrFolder(oldLogicalPath: string, newName: string
   }
   
   await renameEntry(oldPhysicalPath, newPhysicalPath);
-  
-  // 更新同步基线：将旧路径的基线迁移到新路径
-  const oldBaselineSha = getFileBaseline(oldLogicalPath);
-  if (oldBaselineSha) {
-    // 迁移基线到新路径
-    updateFileBaseline(newLogicalPath, oldBaselineSha);
-    // 删除旧路径的基线
-    removeFileBaseline(oldLogicalPath);
-  }
   
   return newLogicalPath;
 }

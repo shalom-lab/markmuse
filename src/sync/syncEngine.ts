@@ -1,31 +1,12 @@
+import { withSyncLock } from './syncCoordinator';
 import { listAllEntries, readTextFile, writeTextFile, deleteFile } from '../storage/opfsFs';
 import { GitHubClient } from './githubClient';
 import { gitBlobSha1 } from './gitSha';
 import type { GitHubConfig } from '../types/type';
 import { toLogicalPath, toPhysicalPath } from '../storage/pathUtils';
-import { updateFileBaseline, removeFileBaseline, clearBaseline } from '../storage/syncBaseline';
+import { getFileBaseline, updateFileBaseline, removeFileBaseline, clearBaseline } from '../storage/syncBaseline';
 
-/**
- * 安全同步策略：保守同步，避免误删
- * 
- * 核心原则：
- * 1. **只同步新增和修改**，不自动删除远程文件（避免误删）
- * 2. **删除操作需要用户明确确认**（通过单独的"清理远程"功能）
- * 3. **初次同步时检测远程数据**，提示用户是否拉取
- * 
- * 同步逻辑（使用基线 SHA 判断）：
- * - 本地 SHA == 基线 SHA && 远程 SHA != 基线 SHA → Pull（远程有更新，本地没改）
- * - 本地 SHA != 基线 SHA → Push（本地改了，覆盖远程）
- * - 本地 SHA == 基线 SHA && 远程 SHA == 基线 SHA → 跳过（两边都没改）
- * - 本地没有但远程有 → Pull（新增到本地）
- * - 本地有但远程没有 → Push（新增到远程）
- * 
- * 删除处理：
- * - 同步时**不处理删除**，只同步新增/修改
- * - 如果用户需要删除远程文件，使用单独的 `cleanupRemoteDeletedFiles()` 函数
- * - 该函数会列出"本地已删除但远程仍存在"的文件，让用户确认后删除
- */
-
+/** Local-first push: remote changes require explicit user resolution. */
 export interface SyncResult {
   pushed: number;      // 推送的文件数
   pulled: number;      // 拉取的文件数
@@ -60,125 +41,50 @@ export async function checkRemoteHasData(cfg: GitHubConfig): Promise<boolean> {
   }
 }
 
-/**
- * 增量推送：本地 → 远程（只增不删）
- * 
- * 策略：
- * 1. 同步前批量获取远程 SHA 映射（1次API调用）
- * 2. 遍历本地文件，计算本地 SHA
- * 3. 比较本地 SHA 和远程 SHA：
- *    - 如果相同 → 跳过（文件没变）
- *    - 如果不同 → PUT（带远程 SHA 更新或创建）
- */
-export async function syncAllMarkdownFiles(cfg: GitHubConfig): Promise<SyncResult> {
+/** Push only when the remote still matches our last successful sync. */
+export function syncAllMarkdownFiles(cfg: GitHubConfig): Promise<SyncResult> {
+  return withSyncLock(() => pushIncremental(cfg));
+}
+
+async function pushIncremental(cfg: GitHubConfig): Promise<SyncResult> {
   const client = new GitHubClient(cfg);
-  const result: SyncResult = {
-    pushed: 0,
-    pulled: 0,
-    deleted: 0,
-    skipped: 0,
-    errors: []
-  };
-
+  const result: SyncResult = { pushed: 0, pulled: 0, deleted: 0, skipped: 0, errors: [] };
   try {
-    // 1. 批量获取远程 SHA 映射（1次API调用）
-    console.log('📥 获取远程文件列表...');
     const remoteFiles = await client.listMarkMuseFiles();
-    const remoteShaMap = new Map<string, string>();
-    for (const remoteFile of remoteFiles) {
-      remoteShaMap.set(remoteFile.localPath, remoteFile.sha);
-    }
-    console.log(`📥 获取到 ${remoteFiles.length} 个远程文件`);
-
-    // 2. 获取所有本地文件
+    const remote = new Map(remoteFiles.map(file => [file.localPath, file.sha]));
     const entries = await listAllEntries();
-    
-    // Markdown 文件
-    const mdFiles = entries.filter(e => !e.isDirectory && e.path.endsWith('.md'));
-    
-    // 主题文件
-    const themeFiles = entries.filter(e => !e.isDirectory && e.path.startsWith('.themes/') && e.path.endsWith('.css'));
-    
-    const allLocalFiles = [...mdFiles, ...themeFiles];
-    console.log(`📤 发现 ${allLocalFiles.length} 个本地文件需要同步`);
-
-    // 3. 遍历本地文件，计算 SHA 并比较
-    for (const file of allLocalFiles) {
+    for (const file of entries) {
+      if (file.isDirectory || !(file.path.startsWith('files/') && file.path.endsWith('.md') || file.path.startsWith('.themes/') && file.path.endsWith('.css'))) continue;
+      const path = toLogicalPath(file.path);
       try {
-        // 转换为逻辑路径（用于与远程映射比较）
-        const logicalPath = toLogicalPath(file.path);
-        
-        // 读取本地文件内容
-        const localContent = await readTextFile(file.path);
-        if (localContent === null) {
-          console.warn(`⚠️ 无法读取本地文件: ${file.path}`);
-          continue;
-        }
-
-        // 计算本地 SHA
-        const localSha = await gitBlobSha1(localContent);
-        
-        // 获取远程 SHA（从映射中查找）
-        const remoteSha = remoteShaMap.get(logicalPath);
-
-        // 判断是否需要推送
-        if (remoteSha && localSha === remoteSha) {
-          // ✅ 文件未变化，跳过
+        const content = await readTextFile(file.path);
+        if (content === null) throw new Error('无法读取本地文件，已停止推送此文件');
+        const sha = await gitBlobSha1(content);
+        const remoteSha = remote.get(path);
+        const baseline = getFileBaseline(path, cfg);
+        if (sha === remoteSha) {
+          updateFileBaseline(path, sha, cfg);
           result.skipped++;
           continue;
         }
-
-        // ❌ 需要推送（文件被修改或新文件）
-        try {
-          if (remoteSha) {
-            // 更新（带远程 SHA）
-            await client.putFile(logicalPath, localContent, remoteSha, `Update ${logicalPath}`);
-            console.log(`⬆️ 更新: ${logicalPath}`);
-          } else {
-            // 创建（不带 SHA）
-            await client.putFile(logicalPath, localContent, undefined, `Create ${logicalPath}`);
-            console.log(`⬆️ 创建: ${logicalPath}`);
-          }
-          result.pushed++;
-        } catch (putError: any) {
-          // 422 错误：文件已存在，需要 SHA（可能远程映射不完整）
-          if (putError.status === 422 && putError.message?.includes('sha')) {
-            console.log(`⚠️ 文件已存在但映射中无 SHA，重新获取: ${logicalPath}`);
-            // 重新获取该文件的 SHA
-            const retryRemote = await client.getFile(logicalPath);
-            if (retryRemote) {
-              // 使用重新获取的 SHA 更新
-              await client.putFile(logicalPath, localContent, retryRemote.sha, `Update ${logicalPath}`);
-              console.log(`⬆️ 更新: ${logicalPath} (重试)`);
-              result.pushed++;
-            } else {
-              throw new Error(`无法获取文件 ${logicalPath} 的 SHA`);
-            }
-          } else {
-            throw putError;
-          }
+        if (remoteSha !== baseline) {
+          throw new Error(remoteSha
+            ? '远程存在未同步的版本，已保留两边内容，请先备份并处理差异'
+            : '远程文件已删除，已暂停推送以免重新创建');
         }
+        // Never retry a rejected write with a newer SHA: that would overwrite a concurrent edit.
+        await client.putFile(path, content, remoteSha, 'Update ' + path);
+        updateFileBaseline(path, sha, cfg);
+        result.pushed++;
       } catch (error: any) {
-        const errorMsg = error?.message || '同步失败';
-        result.errors.push(`${file.path}: ${errorMsg}`);
-        console.error(`❌ 同步文件失败: ${file.path}`, error);
+        result.errors.push(path + ': ' + (error?.message || '推送失败'));
       }
     }
-
-    console.log(`✅ 增量推送完成: 推送 ${result.pushed} 个，跳过 ${result.skipped} 个`);
-    if (result.errors.length > 0) {
-      console.warn(`⚠️ 有 ${result.errors.length} 个错误`);
-    }
-
   } catch (error: any) {
-    const errorMsg = error?.message || '同步失败';
-    result.errors.push(`同步过程失败: ${errorMsg}`);
-    console.error('❌ 同步过程失败:', error);
+    result.errors.push(error?.message || '推送失败');
   }
-
   return result;
 }
-
 
 /**
  * 覆盖本地：用远程数据强制覆盖本地所有文件
@@ -187,7 +93,11 @@ export async function syncAllMarkdownFiles(cfg: GitHubConfig): Promise<SyncResul
  * 3. 拉取远程所有文件
  * 4. 更新基线
  */
-export async function pullAllRemoteFiles(cfg: GitHubConfig): Promise<SyncResult> {
+export function pullAllRemoteFiles(cfg: GitHubConfig): Promise<SyncResult> {
+  return withSyncLock(() => pullAllRemoteFilesUnlocked(cfg), true);
+}
+
+async function pullAllRemoteFilesUnlocked(cfg: GitHubConfig): Promise<SyncResult> {
   const client = new GitHubClient(cfg);
   const result: SyncResult = {
     pushed: 0,
@@ -213,7 +123,7 @@ export async function pullAllRemoteFiles(cfg: GitHubConfig): Promise<SyncResult>
     for (const filePath of filesToDelete) {
       try {
         await deleteFile(filePath);
-        removeFileBaseline(filePath);
+        removeFileBaseline(toLogicalPath(filePath), cfg);
         result.deleted++;
         console.log(`🗑️ 删除本地文件: ${filePath}`);
       } catch (error: any) {
@@ -223,7 +133,7 @@ export async function pullAllRemoteFiles(cfg: GitHubConfig): Promise<SyncResult>
     }
 
     // 2. 清空基线（确保基线干净）
-    clearBaseline();
+    clearBaseline(cfg);
 
     // 3. 列出远程所有文件
     const remoteFiles = await client.listMarkMuseFiles();
@@ -313,7 +223,7 @@ export async function pullAllRemoteFiles(cfg: GitHubConfig): Promise<SyncResult>
         
         // 更新基线（使用逻辑路径，因为基线存储的是逻辑路径）
         const localSha = await gitBlobSha1(fileData.content);
-        updateFileBaseline(remoteFile.localPath, localSha);
+        updateFileBaseline(remoteFile.localPath, localSha, cfg);
         
         result.pulled++;
         console.log(`⬇️ 拉取文件: ${remoteFile.localPath}`);
@@ -339,7 +249,11 @@ export async function pullAllRemoteFiles(cfg: GitHubConfig): Promise<SyncResult>
  * 3. 推送所有本地文件
  * 4. 更新基线
  */
-export async function pushToRemote(cfg: GitHubConfig): Promise<SyncResult> {
+export function pushToRemote(cfg: GitHubConfig): Promise<SyncResult> {
+  return withSyncLock(() => pushToRemoteUnlocked(cfg));
+}
+
+async function pushToRemoteUnlocked(cfg: GitHubConfig): Promise<SyncResult> {
   const client = new GitHubClient(cfg);
   const result: SyncResult = {
     pushed: 0,
@@ -389,7 +303,7 @@ export async function pushToRemote(cfg: GitHubConfig): Promise<SyncResult> {
         if (localPath.startsWith('files/')) {
           localPath = localPath.slice(6);
         }
-        removeFileBaseline(localPath);
+        removeFileBaseline(localPath, cfg);
         result.deleted++;
         console.log(`🗑️ 删除远程文件: ${remoteFile.repoPath}`);
       } catch (error: any) {
@@ -455,7 +369,7 @@ export async function pushToRemote(cfg: GitHubConfig): Promise<SyncResult> {
         }
         
         // 更新基线
-        updateFileBaseline(localFile.path, localSha);
+        updateFileBaseline(toLogicalPath(localFile.path), localSha, cfg);
         
         result.pushed++;
         console.log(`⬆️ 推送文件: ${localFile.path}`);

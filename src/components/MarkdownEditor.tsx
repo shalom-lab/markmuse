@@ -21,6 +21,7 @@ import 'katex/dist/katex.min.css';
 
 interface Props {
   content: string;
+  readOnly?: boolean;
   onChange: (content: string) => void;
   currentFilePath?: string | null;
   isMarkdownCollapsed: boolean;
@@ -32,7 +33,8 @@ interface Props {
 }
 
 export default function MarkdownEditor({ 
-  content, 
+  content,
+  readOnly = false,
   onChange,
   currentFilePath,
   isMarkdownCollapsed,
@@ -801,6 +803,7 @@ export default function MarkdownEditor({
             </div>
           </div>
           <textarea
+            readOnly={readOnly}
             ref={editorRef}
             className="flex-1 min-h-0 p-6 font-mono text-[15px] leading-relaxed resize-none focus:outline-none overflow-auto markdown-editor-scrollbar bg-gray-50"
             onChange={handleInput}

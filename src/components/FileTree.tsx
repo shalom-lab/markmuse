@@ -10,6 +10,7 @@ import type { FileTreeNode } from '../types/type';
 interface Props {
     currentFilePath?: string | null;
     onSelectFile: (filePath: string) => void;
+    onMutate: (path: string, operation: () => Promise<string | null>) => Promise<void>;
     isCollapsed?: boolean;
     onToggleCollapse?: () => void;
 }
@@ -317,7 +318,7 @@ interface CreatingNode {
     tempId: string;
 }
 
-export default function FileTree({ currentFilePath, onSelectFile, isCollapsed = false, onToggleCollapse }: Props) {
+export default function FileTree({ currentFilePath, onSelectFile, onMutate, isCollapsed = false, onToggleCollapse }: Props) {
     const [fileTree, setFileTree] = useState<FileTreeNode[]>([]);
     const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
     const [creatingNode, setCreatingNode] = useState<CreatingNode | null>(null);
@@ -374,6 +375,12 @@ export default function FileTree({ currentFilePath, onSelectFile, isCollapsed = 
         setExpandedPaths(newExpanded);
     };
 
+    useEffect(() => {
+        const refresh = () => { void loadFileTree(); };
+        window.addEventListener('markmuse-files-changed', refresh);
+        return () => window.removeEventListener('markmuse-files-changed', refresh);
+    }, []);
+
     const handleDelete = (path: string, type: 'file' | 'folder', name: string) => {
         setDeleteConfirm({ path, type, name });
     };
@@ -383,11 +390,11 @@ export default function FileTree({ currentFilePath, onSelectFile, isCollapsed = 
 
         try {
             const { path, type, name } = deleteConfirm;
-            if (type === 'file') {
-                await removeFile(path);
-            } else {
-                await removeFolder(path);
-            }
+            await onMutate(path, async () => {
+                if (type === 'file') await removeFile(path);
+                else await removeFolder(path);
+                return null;
+            });
             setDeleteConfirm(null);
             showToast(`${type === 'file' ? '文件' : '文件夹'} "${name}" 删除成功`, { type: 'success' });
             await loadFileTree();
@@ -486,12 +493,8 @@ export default function FileTree({ currentFilePath, onSelectFile, isCollapsed = 
                 ? `${newName}.md` 
                 : newName;
             
-            const resultPath = await renameFileOrFolder(oldPath, finalNewName);
-            console.log('重命名成功，新路径:', resultPath);
+            await onMutate(oldPath, () => renameFileOrFolder(oldPath, finalNewName));
             await loadFileTree();
-            if (oldPath === currentFilePath) {
-                onSelectFile(resultPath);
-            }
         } catch (error: any) {
             // 显示错误提示（不输出到控制台，避免重复显示）
             const errorMessage = error?.message || '重命名失败，请重试';
@@ -537,7 +540,7 @@ export default function FileTree({ currentFilePath, onSelectFile, isCollapsed = 
                 if (hasPermissionError) {
                     showToast('Token 权限不足，请检查 Token 是否有写入权限', { type: 'error' });
                 } else {
-                    showToast(`增量推送完成，但有 ${syncResult.errors.length} 个错误`, { type: 'warning' });
+                    showToast(syncResult.errors[0], { type: 'warning' });
                 }
             } else if (syncResult.pushed === 0 && syncResult.skipped > 0) {
                 showToast('所有文件已是最新，无需同步', { type: 'info' });

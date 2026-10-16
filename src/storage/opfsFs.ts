@@ -46,7 +46,8 @@ export async function readTextFile(path: string): Promise<string | null> {
     const fileHandle = await dir.getFileHandle(parts[parts.length - 1], { create: false });
     const file = await fileHandle.getFile();
     return await file.text();
-  } catch {
+  } catch (error) {
+    if (!(error instanceof DOMException) || error.name !== 'NotFoundError') throw error;
     return null;
   }
 }
@@ -81,8 +82,9 @@ export async function deleteFile(path: string): Promise<void> {
 
   try {
     await dir.removeEntry(parts[parts.length - 1], { recursive: false });
-  } catch {
-    // 忽略不存在等错误
+  } catch (error) {
+    if (!(error instanceof DOMException) || error.name !== 'NotFoundError') throw error;
+    // 删除不存在的条目视为成功
   }
 }
 
@@ -111,8 +113,9 @@ export async function deleteDirectory(path: string): Promise<void> {
 
   try {
     await dir.removeEntry(parts[parts.length - 1], { recursive: true });
-  } catch {
-    // 忽略不存在等错误
+  } catch (error) {
+    if (!(error instanceof DOMException) || error.name !== 'NotFoundError') throw error;
+    // 删除不存在的条目视为成功
   }
 }
 

@@ -1,3 +1,5 @@
+import { DraftSession } from '../storage/draftSession';
+import { registerSyncPreparation } from '../sync/syncCoordinator';
 import { useState, useEffect, useRef } from 'react';
 import Toolbar from '../components/Toolbar';
 import FileTree from '../components/FileTree';
@@ -21,6 +23,57 @@ export default function EditorPage() {
   const [autoSave, setAutoSave] = useState(true);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const draft = useRef(new DraftSession(saveFileContent));
+  const transitioning = useRef(false);
+  const [busy, setBusy] = useState(false);
+
+  const cancelSaveTimer = () => {
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = null;
+  };
+  const flushDraft = async () => {
+    cancelSaveTimer();
+    await draft.current.flush();
+  };
+  const startTransition = () => {
+    if (transitioning.current) throw new Error('正在保存或同步，请稍后重试');
+    transitioning.current = true;
+    setBusy(true);
+  };
+  const endTransition = () => {
+    transitioning.current = false;
+    setBusy(false);
+  };
+  const showDraft = (path: string | null, text = '') => {
+    draft.current.open(path, text);
+    setCurrentFilePath(path);
+    setContent(text);
+  };
+
+  useEffect(() => {
+    const unregister = registerSyncPreparation(async changesLocal => {
+      startTransition();
+      try { await flushDraft(); } catch (error) { endTransition(); throw error; }
+      // Push reads saved snapshots; writing can continue while the network is busy.
+      if (!changesLocal) { endTransition(); return; }
+      return async () => {
+        try {
+          const path = draft.current.path;
+          if (path) {
+            const text = await getFileContent(path);
+            showDraft(text === null ? null : path, text ?? '');
+          }
+          window.dispatchEvent(new Event('markmuse-files-changed'));
+        } finally { endTransition(); }
+      };
+    });
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      if (draft.current.dirty) { event.preventDefault(); event.returnValue = ''; }
+    };
+    window.addEventListener('beforeunload', beforeUnload);
+    return () => { unregister(); cancelSaveTimer(); window.removeEventListener('beforeunload', beforeUnload); };
+  }, []);
+
   // 加载自动保存设置
   useEffect(() => {
     const loadAutoSaveSetting = async () => {
@@ -38,7 +91,7 @@ export default function EditorPage() {
     }
     
     try {
-      await saveFileContent(currentFilePath, content);
+      await flushDraft();
       showToast('文件保存成功', { type: 'success' });
     } catch (error) {
       console.error('保存文件失败:', error);
@@ -63,58 +116,41 @@ export default function EditorPage() {
     };
   }, [autoSave, currentFilePath, content]);
 
-  const handleContentChange = async (newContent: string) => {
+  const handleContentChange = (newContent: string) => {
+    if (transitioning.current) return;
+    draft.current.edit(newContent);
     setContent(newContent);
-    
-    // 如果自动保存开启，立即保存
-    if (autoSave && currentFilePath) {
-      // 清除之前的定时器
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-      
-      // 使用防抖，避免频繁保存（500ms 内只保存一次）
-      saveTimeoutRef.current = setTimeout(async () => {
-        try {
-          if (!currentFilePath) return;
-          await saveFileContent(currentFilePath, newContent);
-        } catch (error) {
-          console.error('自动保存失败:', error);
-        }
+    cancelSaveTimer();
+    if (autoSave && draft.current.path) {
+      saveTimeoutRef.current = setTimeout(() => {
+        void flushDraft().catch(() => showToast('自动保存失败，稿件仍保留在编辑器中，请重试保存', { type: 'error' }));
       }, 500);
     }
-    // 如果自动保存关闭，不保存（内容只在内存中，切换文件时会丢失）
   };
 
   const handleSelectFile = async (filePath: string) => {
-    // 如果自动保存关闭，在切换文件前保存当前文件的修改
-    if (!autoSave && currentFilePath) {
-      const currentContent = await getFileContent(currentFilePath);
-      if (currentContent !== null && content !== currentContent) {
-        try {
-          await saveFileContent(currentFilePath, content);
-        } catch (error) {
-          console.error('保存文件失败:', error);
-        }
-      }
-    }
-    
-    // 清除保存定时器
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-      saveTimeoutRef.current = null;
-    }
-    
-    // 重新加载文件内容（确保是最新的）
+    if (transitioning.current) return;
+    startTransition();
     try {
-      const fileContent = await getFileContent(filePath);
-      setCurrentFilePath(filePath);
-      setContent(fileContent || '');
+      await flushDraft();
+      const text = await getFileContent(filePath);
+      if (text === null) throw new Error('文件不存在或无法读取');
+      showDraft(filePath, text);
     } catch (error) {
-      console.error('加载文件失败:', error);
-      setCurrentFilePath(filePath);
-      setContent('');
-    }
+      showToast(error instanceof Error ? error.message : '打开失败，当前稿件已保留', { type: 'error' });
+    } finally { endTransition(); }
+  };
+
+  const handleFileMutation = async (path: string, operation: () => Promise<string | null>) => {
+    startTransition();
+    try {
+      await flushDraft();
+      const nextPath = await operation();
+      const current = draft.current.path;
+      if (current && (current === path || current.startsWith(path + '/'))) {
+        showDraft(nextPath === null ? null : nextPath + current.slice(path.length), nextPath === null ? '' : draft.current.content);
+      }
+    } finally { endTransition(); }
   };
 
   const handleFormatAction = (shortcut: string) => {
@@ -402,10 +438,12 @@ A: 所有数据存储在浏览器的 OPFS（Origin Private File System）中，�
       try {
         isSyncingRef.current = true;
         const { syncAllMarkdownFiles } = await import('../sync/syncEngine');
-        await syncAllMarkdownFiles(config);
+        const result = await syncAllMarkdownFiles(config);
+        if (result.errors.length) showToast(result.errors[0], { type: 'warning' });
         console.log('定期自动增量推送完成');
       } catch (error) {
         console.error('定期自动增量推送失败:', error);
+        showToast(error instanceof Error ? error.message : '自动推送失败，请重试', { type: 'warning' });
       } finally {
         isSyncingRef.current = false;
       }
@@ -466,7 +504,11 @@ A: 所有数据存储在浏览器的 OPFS（Origin Private File System）中，�
   }, [isSettingsVisible]); // 当设置页面打开/关闭时重新加载
 
   return (
-    <div className="h-screen flex flex-col">
+    <div className="h-screen flex flex-col" aria-busy={busy}
+      onKeyDownCapture={event => { if (busy) { event.preventDefault(); event.stopPropagation(); } }}>
+      {busy && <div className="fixed inset-0 z-[100] cursor-wait flex items-center justify-center bg-white/20" role="status">
+        <span className="rounded bg-white px-4 py-2 shadow">正在保存或更新文件，请稍候…</span>
+      </div>}
       <Toolbar
         isMarkdownVisible={isMarkdownVisible}
         isPreviewVisible={isPreviewVisible}
@@ -517,6 +559,7 @@ A: 所有数据存储在浏览器的 OPFS（Origin Private File System）中，�
           <FileTree 
             currentFilePath={currentFilePath} 
             onSelectFile={handleSelectFile}
+            onMutate={handleFileMutation}
             isCollapsed={isSidebarCollapsed}
             onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
           />
@@ -545,7 +588,8 @@ A: 所有数据存储在浏览器的 OPFS（Origin Private File System）中，�
           ) : currentFilePath ? (
             <MarkdownEditor 
               key={currentFilePath}
-              content={content} 
+              content={content}
+              readOnly={busy}
               onChange={handleContentChange}
               currentFilePath={currentFilePath}
               isMarkdownCollapsed={!isMarkdownVisible}
