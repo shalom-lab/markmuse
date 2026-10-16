@@ -3,6 +3,7 @@ import MarkdownIt from 'markdown-it';
 import markdownItMath from './markdown-it-math';
 import { initMathJax } from './wechatExport';
 import { createHighlightFunction, getDefaultHighlightStyles } from './highlight';
+import { decorateWechatCodeBlocks } from './wechatCodeBlocks';
 
 // MathJax 类型已在 wechatExport.ts 中声明，这里不需要重复声明
 
@@ -445,6 +446,6 @@ export async function convertToWeChatHTMLHeadless(markdown: string, cssText: str
     finalSection.setAttribute('id', 'markmuse');
   }
   
-  return tempContainer.innerHTML;
+  return decorateWechatCodeBlocks(tempContainer.innerHTML);
 }
 

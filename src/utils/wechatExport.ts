@@ -1,5 +1,6 @@
 import juice from 'juice';
 import { getDefaultHighlightStyles } from './highlight';
+import { decorateWechatCodeBlocks } from './wechatCodeBlocks';
 
 // 声明 MathJax 全局类型
 declare global {
@@ -543,7 +544,7 @@ export async function convertToWeChatHTML(previewElement: HTMLElement | null, cs
     finalSection.setAttribute('id', 'markmuse');
   }
   
-  return tempContainer.innerHTML;
+  return decorateWechatCodeBlocks(tempContainer.innerHTML);
 }
 
 // 复制HTML到剪贴板（参考mdnice的copySafari方法）
