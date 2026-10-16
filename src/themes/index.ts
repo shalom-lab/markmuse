@@ -89,6 +89,10 @@ export const defaultThemeCss = `/* 默认 */
   word-wrap: break-word;
 }
 
+#markmuse pre:not(.hljs) {
+  background: #242424;
+}
+
 #markmuse pre::before {
   content: '';
   position: absolute;
