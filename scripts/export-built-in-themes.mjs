@@ -36,21 +36,39 @@ function getProperty(object, propertyName) {
   });
 }
 
+const staticCssVariables = new Map(
+  sourceFile.statements
+    .filter(ts.isVariableStatement)
+    .flatMap((statement) => statement.declarationList.declarations)
+    .filter((declaration) =>
+      ts.isIdentifier(declaration.name) &&
+      declaration.initializer &&
+      ts.isNoSubstitutionTemplateLiteral(declaration.initializer)
+    )
+    .map((declaration) => [declaration.name.text, declaration.initializer.text])
+);
+
 const themes = themesDeclaration.initializer.elements.map((element, index) => {
   const idProperty = getProperty(element, 'id');
   const cssProperty = getProperty(element, 'css');
   const id = idProperty?.initializer;
-  const css = cssProperty?.initializer;
+  const cssExpression = cssProperty?.initializer;
 
   if (!id || !ts.isStringLiteral(id) || !/^[a-z0-9][a-z0-9-]*$/.test(id.text)) {
     throw new Error(`Theme at position ${index + 1} has a missing or invalid id`);
   }
 
-  if (!css || !ts.isNoSubstitutionTemplateLiteral(css)) {
-    throw new Error(`Theme "${id.text}" must define CSS as a static template literal`);
+  const css = cssExpression && ts.isNoSubstitutionTemplateLiteral(cssExpression)
+    ? cssExpression.text
+    : cssExpression && ts.isIdentifier(cssExpression)
+      ? staticCssVariables.get(cssExpression.text)
+      : undefined;
+
+  if (css === undefined) {
+    throw new Error(`Theme "${id.text}" must use a static CSS template literal`);
   }
 
-  return { id: id.text, css: css.text };
+  return { id: id.text, css };
 });
 
 if (themes.length === 0) {

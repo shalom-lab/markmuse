@@ -1,11 +1,7 @@
 // 主题配置
 import type { Theme } from '../types/type';
 
-export const themes: Theme[] = [
-  {
-    id: 'default',
-    name: '默认',
-    css: `/* 默认 */
+export const defaultThemeCss = `/* 默认 */
 #markmuse {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif;
   line-height: 1.8;
@@ -214,7 +210,13 @@ export const themes: Theme[] = [
   border-radius: 8px;
   margin: 1rem 0;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
-}`
+}`;
+
+export const themes: Theme[] = [
+  {
+    id: 'default',
+    name: '默认',
+    css: defaultThemeCss
   },
   {
     id: 'warm',
