@@ -1,0 +1,55 @@
+/* 航线 */
+#markmuse {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  color: #303b45; background-color: #fcfcfa; padding: 0 1.1rem; line-height: 1.95;
+}
+#markmuse h1 {
+  display: table; max-width: 100%; box-sizing: border-box;
+  font-size: 1.75em; font-weight: 700; line-height: 1.5;
+  color: #244660; text-align: center; letter-spacing: 0.04em;
+  margin: 1.8em auto 1.3em; padding: 0.2em 0.5em 0.6em;
+  border: none; border-bottom: 3px solid #c5a15d; background: none;
+  overflow-wrap: break-word;
+}
+#markmuse h2 {
+  display: table; max-width: 100%; box-sizing: border-box;
+  font-size: 1.2em; font-weight: 700; line-height: 1.6;
+  color: #244660; text-align: center; letter-spacing: 0.04em;
+  margin: 2.1em auto 1.2em; background: none;
+  border: 1px solid #244660; border-top: 3px solid #c5a15d; padding: 0.5em 1.1em;
+  overflow-wrap: break-word;
+}
+#markmuse h3 {
+  font-size: 1.06em; font-weight: 700; line-height: 1.65;
+  margin: 1.7em 0 0.8em; padding: 0.08em 0 0.08em 0.7em;
+  color: #244660; background: none; border: none; border-left: 4px solid #c5a15d; text-align: left;
+}
+#markmuse h4, #markmuse h5, #markmuse h6 { color: #244660; font-size: 1em; font-weight: 600; line-height: 1.7; margin: 1.3em 0 0.6em; }
+#markmuse p { margin: 1.1em 0; line-height: 1.95; }
+#markmuse strong { color: #244660; font-weight: 700; }
+#markmuse em { color: #244660; }
+#markmuse a { color: #244660; text-decoration: none; border-bottom: 1px solid #c5a15d; }
+#markmuse blockquote { margin: 1.5em 0; padding: 0.7em 1em; color: #303b45; background-color: #edf2f5; border: none; border-left: 3px solid #244660; font-style: normal; }
+#markmuse blockquote p { margin: 0.55em 0; }
+#markmuse ul, #markmuse ol { margin: 1em 0; padding-left: 1.65em; }
+#markmuse li { display: list-item; margin: 0.45em 0; }
+#markmuse code { font-family: "SF Mono", Consolas, monospace; font-size: 0.88em; color: #244660; background-color: #edf2f5; padding: 0.18em 0.4em; border-radius: 3px; }
+#markmuse pre { margin: 1.4em 0; padding: 2.5rem 1rem 1rem; position: relative; background-color: #242c34; border: none; border-radius: 4px; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word; }
+#markmuse pre::before {
+  content: '';
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: #ff5f56;
+  box-shadow: 20px 0 0 #ffbd2e, 40px 0 0 #27c93f;
+}
+#markmuse pre code { display: block; color: #edf1f5; background: transparent; padding: 0; border: none; line-height: 1.75; }
+#markmuse pre a, #markmuse pre span { border-bottom: none; text-decoration: none; }
+#markmuse hr { border: none; border-top: 1px solid #c5a15d; margin: 2.2em 0; }
+#markmuse table { width: 100%; border-collapse: collapse; margin: 1.3em 0; }
+#markmuse th, #markmuse td { padding: 0.65em 0.8em; border: 1px solid #edf2f5; border-bottom: 1px solid #c5a15d; text-align: left; }
+#markmuse th { color: #244660; background-color: #edf2f5; font-weight: 600; }
+#markmuse img { max-width: 100%; height: auto; border-radius: 4px; }

@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "build:lib": "cd lib && npm run build",
     "publish:lib": "cd lib && npm publish",
+    "export:themes": "node scripts/export-built-in-themes.mjs",
     "test:safety": "node --test test/sync-safety.test.cjs",
     "test:lib": "cd lib && npm run test"
   },

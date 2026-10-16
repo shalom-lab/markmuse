@@ -1,0 +1,72 @@
+/* 极简 · 纸上编辑部 */
+#markmuse {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  color: #393936;
+  background-color: #fdfcf9;
+  line-height: 1.9;
+  padding: 0 1.2rem;
+  max-width: 800px;
+  margin: 0 auto;
+}
+#markmuse h1 {
+  font-family: "Noto Serif SC", "Songti SC", SimSun, serif;
+  font-size: 1.95em;
+  font-weight: 700;
+  line-height: 1.5;
+  letter-spacing: 0.06em;
+  text-align: left;
+  color: #232522;
+  margin: 2rem 0 1.6rem;
+  padding: 0 0 0.8em;
+  border: none;
+  border-bottom: 2px solid #353b35;
+  background: none;
+}
+/* 章节标题：小幅深色签条，取代通栏渐变 */
+#markmuse h2 {
+  display: table;
+  max-width: 100%;
+  box-sizing: border-box;
+  font-size: 1.12em;
+  font-weight: 600;
+  line-height: 1.6;
+  letter-spacing: 0.06em;
+  margin: 2.2em 0 1em;
+  padding: 0.35em 0.9em;
+  color: #fdfcf9;
+  background-color: #353b35;
+  border: none;
+  border-radius: 2px;
+  text-align: left;
+}
+/* 小节以字重和留白建立层级 */
+#markmuse h3 {
+  font-size: 1.06em;
+  font-weight: 700;
+  line-height: 1.65;
+  color: #30362f;
+  margin: 1.8em 0 0.65em;
+  padding: 0 0 0.5em;
+  border: none;
+  border-bottom: 1px solid #e1e2da;
+  background: none;
+  text-align: left;
+}
+#markmuse h4, #markmuse h5, #markmuse h6 { font-size: 1em; color: #51574d; line-height: 1.7; margin: 1.4em 0 0.6em; font-weight: 600; }
+#markmuse p { margin: 1em 0; line-height: 1.95; }
+#markmuse strong { color: #242a23; font-weight: 700; }
+#markmuse em { color: #646b5b; }
+#markmuse a { color: #4f6755; text-decoration: none; border-bottom: 1px solid #a4b09f; }
+#markmuse code { font-family: "SF Mono", Consolas, monospace; font-size: 0.88em; padding: 0.16em 0.4em; color: #545d48; background-color: #eeeee6; border-radius: 3px; }
+#markmuse pre { margin: 1.3em 0; padding: 1.2em; background-color: #292d29; border-radius: 4px; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word; }
+#markmuse pre code { display: block; padding: 0; color: #eeeee5; background: transparent; border: none; line-height: 1.75; }
+#markmuse pre a, #markmuse pre span { border-bottom: none; text-decoration: none; }
+#markmuse blockquote { margin: 1.5em 0; padding: 0.65em 1.15em; background-color: #f1f1e9; border: none; border-left: 2px solid #a3aa94; color: #606555; font-style: normal; }
+#markmuse blockquote p { margin: 0.6em 0; }
+#markmuse ul, #markmuse ol { margin: 0.9em 0; padding-left: 1.6em; }
+#markmuse li { display: list-item; margin: 0.45em 0; }
+#markmuse hr { border: none; border-top: 1px solid #d9dcd1; margin: 2.5em 0; }
+#markmuse table { width: 100%; border-collapse: collapse; margin: 1.3em 0; }
+#markmuse th, #markmuse td { padding: 0.7em 0.8em; border: none; border-bottom: 1px solid #dddfd5; text-align: left; }
+#markmuse th { color: #343b30; background-color: #eeeee6; font-weight: 600; }
+#markmuse img { max-width: 100%; height: auto; border-radius: 3px; }
