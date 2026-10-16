@@ -7,16 +7,20 @@
     "declarationMap": true,
     "emitDeclarationOnly": true,
     "noEmit": false,
-    "composite": true,
+    "composite": false,
     "paths": {
       "@/*": ["../src/*"]
     }
   },
   "include": [
-    "src/**/*.ts",
+    "src/index.ts",
+    "src/bundle.ts",
     "../src/utils/wechatExportHeadless.ts",
     "../src/utils/wechatExport.ts",
-    "../src/utils/markdown-it-math.ts"
+    "../src/utils/markdown-it-math.ts",
+    "../src/utils/highlight.ts",
+    "../src/utils/wechatCodeBlocks.ts",
+    "../src/vite-env.d.ts"
   ],
   "exclude": [
     "node_modules",

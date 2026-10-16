@@ -1,22 +1,23 @@
 {
     "name": "markmuse-wechat",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "description": "Convert Markdown to WeChat Official Account HTML format (requires browser environment)",
     "type": "module",
     "main": "./dist/index.js",
-    "types": "./dist/index.d.ts",
+    "types": "./index.d.ts",
     "exports": {
         ".": {
-            "import": "./dist/index.js",
-            "types": "./dist/index.d.ts"
+            "types": "./index.d.ts",
+            "import": "./dist/index.js"
         },
         "./converter": {
-            "import": "./dist/converter.js",
-            "types": "./dist/converter.d.ts"
+            "types": "./dist/converter.d.ts",
+            "import": "./dist/converter.js"
         }
     },
     "files": [
         "dist",
+        "index.d.ts",
         "README.md"
     ],
     "keywords": [
@@ -49,6 +50,7 @@
         "@types/node": "^20.0.0"
     },
     "scripts": {
+        "prepack": "npm run build",
         "build": "vite build && vite build --config vite.bundle.config.ts && tsc -p tsconfig.converter.json",
         "build:lib": "vite build",
         "build:bundle": "vite build --config vite.bundle.config.ts",
