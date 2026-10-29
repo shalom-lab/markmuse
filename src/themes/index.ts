@@ -64,8 +64,8 @@ export const defaultThemeCss = `/* 默认 */
 #markmuse p {
   margin: 0.8rem 0;
   line-height: 1.9;
-  text-align: justify;
-  word-spacing: 0.05em;
+  text-align: left;
+  word-spacing: normal;
 }
 
 #markmuse code {
