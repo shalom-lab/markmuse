@@ -14,6 +14,7 @@
 import { chromium, Page } from 'playwright';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { createRequire } from 'node:module';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -29,8 +30,7 @@ declare global {
   }
 }
 
-// MathJax CDN URL
-const MATHJAX_CDN = 'https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js';
+const require = createRequire(import.meta.url);
 
 // Bundle 路径缓存
 const BUNDLE_PATH = resolve(__dirname, '../dist/bundle.iife.js');
@@ -59,18 +59,18 @@ async function setupPageEnvironment(page: Page) {
       }
     };
   </script>
-  <script src="${MATHJAX_CDN}"></script>
 </head>
 <body>
 </body>
 </html>
 `;
   await page.setContent(htmlContent);
+  await page.addScriptTag({ path: require.resolve('mathjax/es5/tex-svg.js') });
 
   // 2. 等待 MathJax 加载完成
   await page.waitForFunction(
     () => window.MathJax && typeof window.MathJax.tex2svg === 'function',
-    { timeout: 30000 }
+    undefined, { timeout: 30000 }
   );
 
   // 3. 加载 bundle.js
@@ -79,7 +79,7 @@ async function setupPageEnvironment(page: Page) {
   // 4. 等待 MarkMuse 函数加载完成
   await page.waitForFunction(
     () => window.MarkMuse && typeof window.MarkMuse.convertDefault === 'function',
-    { timeout: 10000 }
+    undefined, { timeout: 10000 }
   );
 }
 

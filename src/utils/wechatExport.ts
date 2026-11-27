@@ -519,7 +519,8 @@ export async function convertToWeChatHTML(previewElement: HTMLElement | null, cs
       }
     }
     const id = el.getAttribute('id');
-    if (id && id !== 'markmuse') {
+    // MathJax <use> elements reference glyph IDs inside the SVG's <defs>.
+    if (id && id !== 'markmuse' && !el.closest('svg defs')) {
       el.removeAttribute('id');
     }
   });

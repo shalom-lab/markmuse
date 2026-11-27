@@ -1,0 +1,1 @@
+{"name":"@markmuse/preview","version":"0.1.0","private":true,"type":"module","exports":"./dist/preview.js","files":["dist"],"scripts":{"build":"vite build --config vite.config.mjs","prepare":"npm run build"}}

@@ -127,9 +127,6 @@ function math_block(state: any, start: number, end: number, silent: boolean) {
   pos += 2;
   firstLine = state.src.slice(pos, max);
 
-  if (silent) {
-    return true;
-  }
   if (firstLine.trim().slice(-2) === '$$') {
     // 单行表达式
     firstLine = firstLine.trim().slice(0, -2);
@@ -163,6 +160,8 @@ function math_block(state: any, start: number, end: number, silent: boolean) {
     }
   }
 
+  if (!found) return false;
+  if (silent) return true;
   state.line = next + 1;
 
   token = state.push('math_block', 'math', 0);

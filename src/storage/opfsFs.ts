@@ -119,72 +119,64 @@ export async function deleteDirectory(path: string): Promise<void> {
   }
 }
 
-// 重命名文件或目录
-export async function renameEntry(oldPath: string, newPath: string): Promise<void> {
-  // OPFS 不支持直接重命名，需要复制后删除
-  const root = await getAppRootDir();
-  
-  // 读取旧文件/目录
-  const oldParts = oldPath.split('/').filter(Boolean);
-  const newParts = newPath.split('/').filter(Boolean);
-  
-  if (oldParts.length === 0 || newParts.length === 0) return;
-  
-  // 检查是文件还是目录
-  let oldDir: FileSystemDirectoryHandle = root;
-  for (let i = 0; i < oldParts.length - 1; i++) {
-    oldDir = await oldDir.getDirectoryHandle(oldParts[i], { create: false });
+type Entry = FileSystemDirectoryHandle | FileSystemFileHandle;
+
+async function copyEntry(source: Entry, parent: FileSystemDirectoryHandle, name: string): Promise<void> {
+  if (source.kind === 'directory') {
+    const target = await parent.getDirectoryHandle(name, { create: true });
+    for await (const [childName, child] of (source as any).entries()) {
+      await copyEntry(child, target, childName);
+    }
+    return;
   }
-  
-  const oldName = oldParts[oldParts.length - 1];
-  
+
+  const file = await source.getFile();
+  const target = await parent.getFileHandle(name, { create: true });
+  const writable = await target.createWritable();
   try {
-    // 尝试作为文件处理
-    const oldFileHandle = await oldDir.getFileHandle(oldName, { create: false });
-    const file = await oldFileHandle.getFile();
-    const content = await file.text();
-    
-    // 写入新路径
-    await writeTextFile(newPath, content);
-    
-    // 删除旧文件
-    await deleteFile(oldPath);
-  } catch {
-    // 如果是目录，需要递归复制
+    await writable.write(file);
+    await writable.close();
+  } catch (error) {
+    await writable.abort().catch(() => {});
+    throw error;
+  }
+}
+
+// Rename within one parent. Keep the complete source until the copy succeeds.
+export async function renameEntry(oldPath: string, newPath: string): Promise<void> {
+  const oldParts = oldPath.split('/');
+  const newParts = newPath.split('/');
+  const oldName = oldParts.pop();
+  const newName = newParts.pop();
+  if (!oldName || !newName || oldParts.join('/') !== newParts.join('/')) {
+    throw new Error('重命名需要同一目录下的有效文件名');
+  }
+  if (oldName === newName) return;
+
+  await navigator.locks.request('markmuse:rename', async () => {
+    let parent = await getAppRootDir();
+    for (const part of oldParts) parent = await parent.getDirectoryHandle(part);
+    let source: Entry | undefined;
+    for await (const [name, entry] of (parent as any).entries()) {
+      if (name === newName) throw new Error(`"${newName}" 已存在`);
+      if (name === oldName) source = entry;
+    }
+    if (!source) throw new Error(`"${oldName}" 不存在`);
+
     try {
-      const oldDirHandle = await oldDir.getDirectoryHandle(oldName, { create: false });
-      
-      // 创建新目录
-      await createDirectory(newPath);
-      
-      // 递归复制目录内容
-      const newDir = await getAppRootDir();
-      let newDirHandle: FileSystemDirectoryHandle = newDir;
-      for (const part of newParts) {
-        newDirHandle = await newDirHandle.getDirectoryHandle(part, { create: true });
-      }
-      
-      // 遍历旧目录并复制所有内容
-      for await (const [name, handle] of (oldDirHandle as any).entries()) {
-        const childOldPath = `${oldPath}/${name}`;
-        const childNewPath = `${newPath}/${name}`;
-        
-        if (handle.kind === 'file') {
-          const file = await (handle as FileSystemFileHandle).getFile();
-          const content = await file.text();
-          await writeTextFile(childNewPath, content);
-        } else {
-          await renameEntry(childOldPath, childNewPath);
+      await copyEntry(source, parent, newName);
+    } catch (error) {
+      try {
+        await parent.removeEntry(newName, { recursive: true });
+      } catch (cleanupError) {
+        if (!(cleanupError instanceof DOMException && cleanupError.name === 'NotFoundError')) {
+          throw new Error(`复制失败，原件已保留。清理目标失败：${cleanupError}`);
         }
       }
-      
-      // 删除旧目录
-      await deleteDirectory(oldPath);
-    } catch (error) {
-      console.error('重命名失败:', error);
       throw error;
     }
-  }
+    await parent.removeEntry(oldName, { recursive: source.kind === 'directory' });
+  });
 }
 
 // 列出指定目录下的直接子项（不递归）

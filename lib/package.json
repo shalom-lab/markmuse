@@ -58,6 +58,8 @@
         "type-check": "tsc --noEmit",
         "preview": "vite preview",
         "test:node": "node test-local.js",
+        "test": "npm run build && npm run test:svg && node test-paragraph-layout.mjs && node test-core.mjs",
+        "test:svg": "node test-svg-glyphs.mjs",
         "test:browser": "echo '请在浏览器中打开 test-browser.html 文件进行测试'"
     }
 }

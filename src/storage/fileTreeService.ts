@@ -182,27 +182,6 @@ export async function renameFileOrFolder(oldLogicalPath: string, newName: string
   const oldPhysicalPath = toPhysicalPath(oldLogicalPath);
   const newPhysicalPath = toPhysicalPath(newLogicalPath);
   
-  // 检查新名称是否已存在
-  try {
-    const existing = await readTextFile(newPhysicalPath);
-    if (existing !== null) {
-      throw new Error(`"${newName}" 已存在`);
-    }
-  } catch (error: any) {
-    if (!error.message?.includes('已存在')) {
-      // 可能是目录，继续检查
-      const root = await (await import('./opfsFs')).getAppRootDir();
-      const newParts = newPhysicalPath.split('/').filter(Boolean);
-      let dir: FileSystemDirectoryHandle = root;
-      for (const part of newParts) {
-        dir = await dir.getDirectoryHandle(part, { create: false });
-      }
-      throw new Error(`"${newName}" 已存在`);
-    } else {
-      throw error;
-    }
-  }
-  
   await renameEntry(oldPhysicalPath, newPhysicalPath);
   
   return newLogicalPath;
